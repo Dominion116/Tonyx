@@ -1,21 +1,23 @@
 # Tonyx — Implementation Plan
 
-**Version:** 1.0 | **Date:** June 2026  
+**Version:** 1.1 | **Date:** June 2026  
 **Stack:** Next.js 14 · Express/Node.js 22 · MongoDB Atlas · Omniston SDK · Mira AI · x402 · Telegram Bot API
+
+> Patterns from [Agent Ada](https://github.com/oyewale-dominion/Agent-Ada) inform this plan where the two stacks overlap: type-only imports from `packages/shared` into `apps/web`, lean wallet SDKs, and backend-first phase ordering (agent core and API ship before any UI).
 
 ---
 
 ## Overview
 
-Implementation is split into five phases. Each phase is independently shippable and builds on the previous one.
+Implementation is split into five phases. Each phase is independently shippable and builds on the previous one. All frontend and UI work is consolidated into Phase 4 so the agent core, API, and integrations are hardened before any interface is built on top of them.
 
 | Phase | Name | Outcome |
 |-------|------|---------|
 | 0 | Foundation | Mono-repo wired, shared types, CI green |
 | 1 | Backend Core | Live API with pool scanner and x402 gate |
-| 2 | Web Dashboard | Full dashboard — connect, scan, quote, execute |
-| 3 | AI & Chat Layer | Mira chat panel with cross-session memory |
-| 4 | Telegram Mini App | Full Mini App — onboard, approve, notify |
+| 2 | AI & Chat Backend | Chat API, cross-session memory, Mira evaluation |
+| 3 | Telegram Bot & Notifications | Bot, webhook, notification dispatch, scanner integration |
+| 4 | Frontend & UI | Web dashboard, chat panel, Telegram Mini App WebView |
 | 5 | Hardening & Launch | Security, performance, monitoring, deployment |
 
 ---
@@ -25,25 +27,27 @@ Implementation is split into five phases. Each phase is independently shippable 
 **Goal:** Every engineer can clone, install, and run the full stack locally in one command.
 
 ### 0.1 Mono-repo Bootstrap
-- [ ] Initialise Turborepo workspace with `pnpm` workspaces
+- [ ] Initialise Turborepo workspace with `npm` workspaces
 - [ ] Create directory skeleton:
   ```
   apps/
-    web/          ← Next.js 14
-    api/          ← Express on Node.js 22
+    web/          <- Next.js 14
+    api/          <- Express on Node.js 22
   packages/
-    shared/       ← TypeScript types + Zod schemas
-    omniston/     ← Omniston SDK wrapper
-    mira/         ← Mira AI client adapter
+    shared/       <- TypeScript types + Zod schemas
+    omniston/     <- Omniston SDK wrapper
+    mira/         <- Mira AI client adapter
   ```
 - [ ] Root `turbo.json` with `dev`, `build`, `lint`, `test` pipelines
-- [ ] `.env.example` files for `apps/web` and `apps/api` covering all variables from §12
+- [ ] Root `package.json` with `workspaces` field pointing to `apps/*` and `packages/*`
+- [ ] `.env.example` files for `apps/web` and `apps/api` covering all variables from the env reference section below
 
 ### 0.2 Shared Package (`packages/shared`)
-- [ ] Zod schemas for every MongoDB document (users, policies, runs, notifications, chat_sessions, chat_messages)
+- [ ] Zod schemas for every MongoDB document: `users`, `policies`, `runs`, `notifications`, `chat_sessions`, `chat_messages`
 - [ ] Inferred TypeScript types exported alongside each schema
-- [ ] Shared API request/response types for every endpoint in §9
-- [ ] Zod schema for Mira recommendation object (§11)
+- [ ] Shared API request/response types for every endpoint in the API contract
+- [ ] Zod schema for Mira recommendation object
+- [ ] **Note (from Agent Ada):** `apps/web` must only import types from `packages/shared` using `import type { ... }`. Never import a runtime value (Zod schema, default objects) into a web client component. Validate web forms inline rather than importing schemas.
 
 ### 0.3 Omniston Package (`packages/omniston`)
 - [ ] Install Omniston SDK v1beta8
@@ -52,16 +56,15 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 0.4 Mira Package (`packages/mira`)
 - [ ] Mira API client with typed `evaluate(context)` and `chat(messages, context)` methods
-- [ ] Context builder utility that assembles pool data + policy + balance into Mira's expected input shape
+- [ ] Context builder utility that assembles pool data, policy, and balance into Mira's expected input shape
 - [ ] Unit tests with mocked Mira responses
 
-### 0.5 CI/CD Baseline
-- [ ] GitHub Actions: lint → type-check → unit tests on every PR
-- [ ] Vercel project linked to `apps/web` (preview deployments on PR)
-- [ ] Render service linked to `apps/api` (preview deployment on PR)
-- [ ] MongoDB Atlas: dev cluster provisioned, connection string in GitHub secrets
+### 0.5 Local Dev Baseline
+- [ ] Vercel project linked to `apps/web`
+- [ ] Render service linked to `apps/api`
+- [ ] MongoDB Atlas: dev cluster provisioned, connection string in `.env` files
 
-**Phase 0 exit criteria:** `pnpm dev` starts both apps. All lint and type-check steps pass. Shared types resolve across packages.
+**Phase 0 exit criteria:** `npm run dev` starts both apps. All lint and type-check steps pass. Shared types resolve across packages.
 
 ---
 
@@ -78,11 +81,11 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 1.2 MongoDB Atlas Connection
 - [ ] Mongoose connection with retry logic
-- [ ] Models for all six collections (§8.3): `users`, `policies`, `runs`, `notifications`, `chat_sessions`, `chat_messages`
+- [ ] Models for all six collections: `users`, `policies`, `runs`, `notifications`, `chat_sessions`, `chat_messages`
 - [ ] Index creation on startup: `walletAddress` (all collections), `sessionId` (chat_messages), `deletedAt` (chat_sessions)
 
 ### 1.3 Authentication Layer
-- [ ] `POST /api/wallet/connect` — accepts wallet address, returns signed JWT session token (§9)
+- [ ] `POST /api/wallet/connect` — accepts wallet address, returns signed JWT session token
 - [ ] Session middleware that validates JWT and attaches `req.wallet` to every protected route
 - [ ] Telegram HMAC middleware for `POST /api/telegram/webhook`
 
@@ -98,7 +101,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 ### 1.6 Quote & Execute Endpoints
 - [ ] `POST /api/agent/quote` — calls `packages/omniston` for route, runs policy eligibility check, computes x402 fee from `X402_FEE_USDT`, returns proposal object with one-time `approvalToken`
 - [ ] `POST /api/agent/execute` — x402 middleware gate (returns HTTP 402 before payment), validates `approvalToken`, submits route via Omniston, creates `runs` document with status `pending`, fires async execution coroutine
-- [ ] Execution coroutine: polls TonAPI for `txHash`, transitions run status through `executing → completed | failed`, updates MongoDB
+- [ ] Execution coroutine: polls TonAPI for `txHash`, transitions run status through `executing -> completed | failed`, updates MongoDB
 
 ### 1.7 Run History Endpoints
 - [ ] `GET /api/agent/runs/:address` — paginated run list (limit/cursor), includes all statuses
@@ -109,175 +112,188 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 1.9 x402 Middleware
 - [ ] Generic x402 Express middleware: checks for valid payment proof in request header, verifies against `X402_WALLET_ADDRESS`, rejects with HTTP 402 + payment requirement payload if missing
-- [ ] Applied to `POST /api/agent/execute` and later to `POST /api/chat/sessions/:sessionId/messages`
+- [ ] Applied to `POST /api/agent/execute` and `POST /api/chat/sessions/:sessionId/messages`
 
-**Phase 1 exit criteria:** Swagger UI shows all endpoints. Authenticated `curl` calls to `/api/pools`, `/api/agent/quote`, and `/api/agent/execute` return expected shaped responses. A full quote→execute→poll cycle writes a `completed` run document.
-
----
-
-## Phase 2 — Web Dashboard
-
-**Goal:** A functional web dashboard covering wallet connection, portfolio overview, yield scanning, policy management, and rebalance execution.
-
-### 2.1 Next.js 14 App Setup (`apps/web`)
-- [ ] App Router with TypeScript strict mode
-- [ ] `shadcn/ui` init + Tailwind CSS configured with a neutral base theme
-- [ ] Shared layout with sidebar navigation: Overview · Scanner · History · Policy · Chat
-- [ ] API client module (typed fetch wrapper) using types from `packages/shared`
-
-### 2.2 Wallet Connection
-- [ ] Install and configure `@ton-connect/ui` (TON AppKit)
-- [ ] Install and configure Privy SDK for embedded wallet fallback
-- [ ] `WalletButton` component in the top nav — shows connect state or truncated address
-- [ ] On connect: call `POST /api/wallet/connect`, store JWT in `httpOnly` cookie via Next.js Route Handler
-- [ ] Persist connection across sessions; auto-reconnect on page load if cookie valid
-
-### 2.3 Portfolio Overview Page (`/`)
-- [ ] Fetch balance from `GET /api/balance/:address`; show TON, USDT, and LP token balances in cards
-- [ ] Active pool positions table: pool name, deposited amount, current APR
-- [ ] Lifetime yield earned (sum of `yieldEarnedUsdt` across completed runs)
-- [ ] Total x402 fees paid (sum of `x402FeeUsdt` across completed runs)
-- [ ] 30-second polling with `SWR` or React Query; optimistic refresh after execute
-
-### 2.4 Yield Scanner Page (`/scanner`)
-- [ ] Fetch pool list from `GET /api/pools`
-- [ ] Ranked table: pool name, asset pair, APR, liquidity depth, estimated net gain for user's idle balance
-- [ ] Crosschain opportunities flagged with estimated bridge cost and net gain after all fees
-- [ ] "Rebalance Now" button on each row → triggers quote flow
-
-### 2.5 Quote & Execute Flow
-- [ ] `QuoteModal` component: calls `POST /api/agent/quote`, renders proposal card (origin, destination, estimated yield, x402 fee, net gain, Mira plain-language explanation)
-- [ ] Wallet signature step before execution (TON AppKit sign-message)
-- [ ] Calls `POST /api/agent/execute` with `approvalToken`; handles HTTP 402 by prompting x402 payment
-- [ ] Polls `GET /api/agent/runs/:id/status` and updates modal state (pending → executing → completed)
-- [ ] On completion: toast notification with yield earned; invalidates balance and runs caches
-
-### 2.6 Policy Manager Page (`/policy`)
-- [ ] Form fields: minimum net gain, cooldown period, spending floor, eligible assets (multi-select), approval mode toggle
-- [ ] Client-side Zod validation matching `packages/shared` policy schema
-- [ ] Wallet signature required on submit (surfaced inline via TON AppKit)
-- [ ] Policy version history table: version number, changed fields diff, timestamp
-
-### 2.7 Run History Page (`/history`)
-- [ ] Paginated table of all runs: timestamp, origin pool, destination pool, amount, yield earned, x402 fee, status
-- [ ] Link to TON explorer for each completed run via `txHash`
-- [ ] Separate "Skipped" tab for dismissed opportunities
-
-**Phase 2 exit criteria:** Full quote→approve→execute cycle completes in the browser. Policy update requires and accepts a wallet signature. Run history reflects completed and skipped runs.
+**Phase 1 exit criteria:** Swagger UI shows all endpoints. Authenticated `curl` calls to `/api/pools`, `/api/agent/quote`, and `/api/agent/execute` return expected shaped responses. A full quote-to-execute-to-poll cycle writes a `completed` run document.
 
 ---
 
-## Phase 3 — AI & Chat Layer
+## Phase 2 — AI & Chat Backend
 
-**Goal:** Mira is available in the dashboard chat panel with cross-session memory, streaming responses, and inline proposal cards.
+**Goal:** All server-side Mira and chat infrastructure is complete and testable via API before any UI depends on it.
 
-### 3.1 Chat API Endpoints (`apps/api`)
+### 2.1 Chat API Endpoints (`apps/api`)
 - [ ] `POST /api/chat/sessions` — creates session, auto-generates title placeholder, returns `{ sessionId, title, createdAt }`
 - [ ] `GET /api/chat/sessions/:address` — lists non-deleted sessions ordered by `lastActivityAt` desc
-- [ ] `GET /api/chat/sessions/:sessionId/messages` — returns paginated messages (cursor-based, `before` param)
+- [ ] `GET /api/chat/sessions/:sessionId/messages` — returns paginated messages (cursor-based, `before` query param)
 - [ ] `POST /api/chat/sessions/:sessionId/messages` — main message endpoint (x402 gated):
   - Validates session belongs to requesting wallet
   - Assembles cross-session memory: last 40 messages across all wallet sessions ordered by `createdAt` desc, excluding active session
   - Fetches live yield snapshot (pool APRs, user balance, active policy)
-  - Forwards to `packages/mira` `chat()` method
+  - Forwards assembled context to `packages/mira` `chat()` method
   - Streams SSE response back to client
-  - If Mira returns a proposal object, emits `{ type: 'proposal', data: {...} }` event
-  - Saves both messages to `chat_messages` with `contextSnapshot` on assistant message
-  - Updates `lastActivityAt` on session
-- [ ] `DELETE /api/chat/sessions/:sessionId` — soft delete (sets `deletedAt`); messages retained
+  - If Mira returns a proposal object, emits `{ type: 'proposal', data: { quoteId, summary, estimatedYield, x402Fee, netGain } }` event
+  - Saves both messages to `chat_messages` with `contextSnapshot` on the assistant message
+  - Updates `lastActivityAt` on the session document
+- [ ] `DELETE /api/chat/sessions/:sessionId` — soft delete (sets `deletedAt`); messages retained in MongoDB
 
-### 3.2 Cross-Session Memory Logic
+### 2.2 Cross-Session Memory Logic
 - [ ] `buildMemoryContext(walletAddress, activeSessionId)` utility in `apps/api/src/lib/`
 - [ ] Queries `chat_messages` for wallet across all sessions excluding active; orders by `createdAt` desc; takes up to 40 messages
 - [ ] Summarises prior-session messages into a condensed history block (one paragraph per session)
-- [ ] Respects sliding window: if combined token estimate exceeds limit, drops oldest prior-session content first; never truncates active thread
+- [ ] Sliding window: if combined token estimate exceeds the configured limit, drops oldest prior-session content first; active thread is never truncated
 
-### 3.3 Mira Context Builder
+### 2.3 Mira Context Builder
 - [ ] `buildEvaluationContext(walletAddress)` in `packages/mira`: fetches pool APRs, Omniston quote for top candidate, estimated costs, active policy, idle balance, last three runs
-- [ ] Returns typed context object that maps directly to Mira's expected input shape
+- [ ] Returns typed context object mapping directly to Mira's expected input shape
 
-### 3.4 Dashboard Chat Panel (`apps/web`)
-- [ ] Persistent right-sidebar `ChatPanel` component visible on all dashboard pages
-- [ ] Session list sidebar: all sessions ordered by last activity; "New Chat" button at top
-- [ ] Active session message thread with streaming content rendering (SSE consumer)
-- [ ] `ProposalCard` component: renders when SSE emits `type: 'proposal'`; shows origin, destination, yield, fee, net gain; Approve / Dismiss buttons
-- [ ] Approve in chat: calls `POST /api/agent/execute` inline, polls status, shows result in thread
-- [ ] Message composer with submit on Enter, Shift+Enter for newline
-- [ ] Session rename: inline edit on session title in the list
-- [ ] Soft delete: removes session from list; confirmation modal warns that history is retained for memory
+### 2.4 Mira Evaluation on Rebalance Trigger
+- [ ] `POST /api/agent/quote` enhanced to invoke `packages/mira` `evaluate()` before returning the raw Omniston quote
+- [ ] Response includes Mira's `proceed` flag, `confidence` score (0-1), and `explanation` string alongside the standard proposal fields
+- [ ] `proceed: false` responses still return HTTP 200 but include no `approvalToken`; the frontend (Phase 4) will render an explanation card with no Approve button
+- [ ] `proceed: true` responses include the `approvalToken` and Mira's plain-language explanation
 
-### 3.5 Mira Evaluation on Rebalance Trigger
-- [ ] Rebalance Now (dashboard button and scanner row) invokes Mira evaluate first, not a raw quote
-- [ ] Mira `proceed: false` → renders explanation card with no Approve button
-- [ ] Mira `proceed: true` → renders full proposal card with Approve button and confidence score
-
-**Phase 3 exit criteria:** User can open a chat session, ask "what is the best pool right now?", receive a streamed plain-language answer, and if Mira identifies an opportunity, tap Approve inline and see the run complete without leaving the chat panel. A new session inherits memory from a prior session without being told anything.
+**Phase 2 exit criteria:** `POST /api/chat/sessions/:sessionId/messages` streams an SSE response via `curl`. Cross-session memory query is verified by seeding two sessions and confirming the second picks up context from the first. `POST /api/agent/quote` returns a Mira-evaluated response with a `proceed` flag.
 
 ---
 
-## Phase 4 — Telegram Mini App
+## Phase 3 — Telegram Bot & Notifications
 
-**Goal:** Full Telegram Mini App experience — onboard, monitor, approve, and configure, all without leaving Telegram.
+**Goal:** The Telegram bot is live, the webhook processes approvals, and the scanner dispatches notifications, all without any Mini App WebView frontend.
 
-### 4.1 Telegram Bot Setup
+### 3.1 Telegram Bot Setup
 - [ ] Create Tonyx bot via BotFather; register `TELEGRAM_BOT_TOKEN`
-- [ ] Configure webhook: `POST /api/telegram/webhook` with HMAC secret
+- [ ] Configure webhook: `POST /api/telegram/webhook` with HMAC secret; verify signature on every incoming request
 - [ ] Bot commands: `/start`, `/status`, `/rebalance`, `/policy`, `/history`
-- [ ] `/start` handler: sends welcome message + "Launch App" button wired to the Mini App URL
+- [ ] `/start` handler: sends welcome message and a "Launch App" button wired to the Mini App URL (Mini App WebView ships in Phase 4)
 
-### 4.2 Mini App WebView Pages (`apps/web/app/mini-app/`)
-- [ ] Separate Next.js route group under `/mini-app` with Telegram Mini App SDK initialised
+### 3.2 Notification Dispatch
+- [ ] Background scanner (built in Phase 1) extended to check qualifying opportunities per wallet every scan cycle
+- [ ] For wallets with `approvalMode: 'manual'` and a qualifying rebalance: sends Telegram message via Bot API with inline keyboard: Approve / Dismiss
+- [ ] For wallets with `approvalMode: 'auto'`: auto-executes by calling the execute coroutine directly, then sends a confirmation message
+- [ ] Dispatch respects `quietHoursStart`/`quietHoursEnd` and `alertFrequency` from the `notifications` document
+
+### 3.3 Webhook Callback Processing
+- [ ] Inline keyboard callback handler: routes `approve_<runId>` to the execute coroutine, `dismiss_<runId>` to skip logic
+- [ ] Skip logic: sets run status to `skipped`, records dismissal timestamp, resets cooldown timer
+- [ ] Execution confirmation message: "Rebalanced - earned $X.XX - fee $Y.YY - tx: [link]"
+- [ ] Failed execution message with error summary and a retry suggestion
+
+### 3.4 Bot Command Handlers
+- [ ] `/status` — replies with idle balance, deployed balance, current APR of active position, and last run summary
+- [ ] `/rebalance` — triggers Mira evaluate for the user's wallet; replies with a proposal message + Approve/Dismiss buttons if `proceed: true`, or Mira's explanation if `proceed: false`
+- [ ] `/policy` — replies with active policy summary and a "Edit in app" button linking to the Mini App settings screen (live in Phase 4)
+- [ ] `/history` — replies with last five runs as formatted text
+
+**Phase 3 exit criteria:** Sending `/start` to the bot returns the welcome message. Sending `/rebalance` triggers a Mira evaluation and returns a proposal message with inline buttons. Tapping Approve from a Telegram notification executes a run and sends a confirmation reply. `/status` returns live balance data.
+
+---
+
+## Phase 4 — Frontend & UI
+
+**Goal:** Web dashboard and Telegram Mini App WebView are fully functional, consuming the complete backend built in Phases 1-3.
+
+### 4.1 Next.js 14 App Setup (`apps/web`)
+- [ ] App Router with TypeScript strict mode
+- [ ] `shadcn/ui` init + Tailwind CSS configured with a neutral base theme
+- [ ] Two layout groups: `(dashboard)` for the web dashboard, `(mini-app)` for the Telegram Mini App WebView
+- [ ] API client module (typed fetch wrapper) using types from `packages/shared` — import with `import type { ... }` only; never import Zod schemas or runtime values into web components
+- [ ] Form validation replicated inline (no shared Zod import in client components)
+
+### 4.2 Wallet Connection (Web)
+- [ ] Install and configure `@ton-connect/ui` (TON AppKit) — prefer the minimal connector surface; avoid heavy multi-chain SDK bundles
+- [ ] Install and configure Privy SDK for embedded wallet fallback
+- [ ] `WalletButton` component in the top nav showing connect state or truncated address
+- [ ] On connect: call `POST /api/wallet/connect`, store JWT in `httpOnly` cookie via Next.js Route Handler
+- [ ] Persist connection across sessions; auto-reconnect on page load if cookie is valid
+
+### 4.3 Portfolio Overview Page (`/`)
+- [ ] Fetch balance from `GET /api/balance/:address`; show TON, USDT, and LP token balances in cards
+- [ ] Active pool positions table: pool name, deposited amount, current APR
+- [ ] Lifetime yield earned (sum of `yieldEarnedUsdt` across completed runs)
+- [ ] Total x402 fees paid (sum of `x402FeeUsdt` across completed runs)
+- [ ] 30-second polling with SWR or React Query; optimistic refresh after execute
+
+### 4.4 Yield Scanner Page (`/scanner`)
+- [ ] Fetch pool list from `GET /api/pools`
+- [ ] Ranked table: pool name, asset pair, APR, liquidity depth, estimated net gain for user's idle balance
+- [ ] Crosschain opportunities flagged with estimated bridge cost and net gain after all fees
+- [ ] "Rebalance Now" button on each row triggers the quote flow
+
+### 4.5 Quote & Execute Flow (Web)
+- [ ] `QuoteModal` component: calls `POST /api/agent/quote`, checks Mira `proceed` flag
+- [ ] `proceed: false` — renders `ExplanationCard` with Mira's plain-language reason; no Approve button
+- [ ] `proceed: true` — renders `ProposalCard` (origin, destination, estimated yield, x402 fee, net gain, Mira explanation, confidence badge); Approve and Dismiss buttons
+- [ ] Approve: wallet signature via TON AppKit sign-message, then `POST /api/agent/execute` with `approvalToken`; handles HTTP 402 by prompting x402 payment
+- [ ] Polls `GET /api/agent/runs/:id/status` and updates modal state (`pending -> executing -> completed`)
+- [ ] On completion: toast notification with yield earned; invalidates balance and runs caches
+
+### 4.6 Policy Manager Page (`/policy`)
+- [ ] Form fields: minimum net gain, cooldown period, spending floor, eligible assets (multi-select), approval mode toggle
+- [ ] Client-side validation written inline (not imported from `packages/shared`)
+- [ ] Wallet signature required on submit via TON AppKit
+- [ ] Policy version history table: version number, changed fields diff, timestamp
+
+### 4.7 Run History Page (`/history`)
+- [ ] Paginated table of all runs: timestamp, origin pool, destination pool, amount, yield earned, x402 fee, status
+- [ ] Link to TON explorer for each completed run via `txHash`
+- [ ] Separate "Skipped" tab for dismissed opportunities
+
+### 4.8 Dashboard Chat Panel
+- [ ] Persistent right-sidebar `ChatPanel` component visible on all dashboard pages
+- [ ] Session list sidebar: all sessions ordered by last activity; "New Chat" button at top
+- [ ] Active session message thread with streaming content rendering (SSE consumer)
+- [ ] `ProposalCard` component: renders when SSE emits `type: 'proposal'`; shows origin, destination, yield, fee, net gain; Approve and Dismiss buttons
+- [ ] Approve in chat: calls `POST /api/agent/execute` inline, polls status, shows result in thread
+- [ ] Message composer with submit on Enter, Shift+Enter for newline
+- [ ] Session rename: inline edit on session title in the list
+- [ ] Soft delete: removes session from list; confirmation modal warns that message history is retained for cross-session memory
+
+### 4.9 Telegram Mini App WebView (`apps/web/app/(mini-app)/`)
+- [ ] Separate Next.js route group with Telegram Mini App SDK initialised
 - [ ] Apply Telegram theme variables to Tailwind: `--tg-theme-bg-color`, `--tg-theme-button-color`, etc.
-- [ ] Compact layout with bottom navigation: Home · Scanner · Chat · Settings
+- [ ] Compact layout with bottom navigation: Home, Scanner, Chat, Settings
 - [ ] Back-button handled via `Telegram.WebApp.BackButton`
 
-### 4.3 Onboarding Flow (`/mini-app/onboard`)
+### 4.10 Onboarding Flow (`/mini-app/onboard`)
 - [ ] Step 1: Wallet connection — TON AppKit inside WebView; Privy embedded wallet fallback
-- [ ] Step 2: Mira-guided policy setup — conversational prompts rendered as a styled Q&A:
+- [ ] Step 2: Mira-guided policy setup as a styled conversational Q&A:
   - "What's your spending floor?" (slider + text input)
   - "What minimum gain triggers a rebalance?" (preset options + custom)
   - "How often should I check?" (cooldown dropdown)
   - "Should I execute automatically or ask you first?" (toggle)
-- [ ] Step 3: Policy review — summary card with all values
-- [ ] Step 4: Wallet signature — TON AppKit sign prompt; on success calls `POST /api/policy`
+- [ ] Step 3: Policy review summary card
+- [ ] Step 4: Wallet signature via TON AppKit; on success calls `POST /api/policy`
 - [ ] Onboarding state persisted in `localStorage`; completed users skip to Home on next open
 
-### 4.4 Home Screen (`/mini-app`)
+### 4.11 Mini App Home Screen (`/mini-app`)
 - [ ] Balance cards: idle balance, deployed balance, current APR of active position, lifetime yield
-- [ ] "Rebalance Now" button → triggers Mira evaluate → shows proposal sheet
-- [ ] Recent activity feed: last three runs with one-line summaries (e.g. "Earned $0.84 in USDT/TON pool · 2 h ago")
+- [ ] "Rebalance Now" button triggers Mira evaluate and shows the proposal bottom sheet
+- [ ] Recent activity feed: last three runs with one-line summaries
 - [ ] Pull-to-refresh using `Telegram.WebApp` haptic feedback
 
-### 4.5 Proposal Sheet (Approve / Dismiss)
+### 4.12 Mini App Proposal Sheet
 - [ ] Bottom sheet with proposal details: origin pool, destination pool, estimated yield, x402 fee, net gain, Mira explanation
-- [ ] "Approve" button → wallet signature → `POST /api/agent/execute` → loading state → success/failure state
-- [ ] "Dismiss" button → records skip via backend; sheet closes
-- [ ] Sheet is triggered both from "Rebalance Now" and from inline approve/dismiss in notification deep link
+- [ ] Approve button: wallet signature then `POST /api/agent/execute` then loading state then success/failure
+- [ ] Dismiss button: records skip via backend; sheet closes
+- [ ] Sheet is triggered both from "Rebalance Now" and from notification deep links
 
-### 4.6 Telegram Notifications
-- [ ] Background scanner in `apps/api` (already built in Phase 1) checks qualifying opportunities per wallet every scan cycle
-- [ ] For wallets with `approvalMode: 'manual'` and a qualifying rebalance: sends Telegram message via Bot API with inline keyboard buttons: ✅ Approve / ❌ Dismiss
-- [ ] For wallets with `approvalMode: 'auto'`: auto-executes and sends confirmation message
-- [ ] Webhook handler processes inline keyboard callbacks: routes to execute or skip logic
-- [ ] Respects `quietHoursStart`/`quietHoursEnd` and `alertFrequency` from notifications document
-- [ ] Execution confirmation message: "Rebalanced ✅ — earned $X.XX · fee $Y.YY · tx: [link]"
-
-### 4.7 Scanner Screen (`/mini-app/scanner`)
+### 4.13 Mini App Scanner Screen (`/mini-app/scanner`)
 - [ ] Same pool table as web dashboard, adapted for mobile viewport
-- [ ] Tap a row → bottom sheet with pool detail + "Rebalance into this pool" CTA
+- [ ] Tap a row: bottom sheet with pool detail and "Rebalance into this pool" CTA
 
-### 4.8 Chat Screen (`/mini-app/chat`)
+### 4.14 Mini App Chat Screen (`/mini-app/chat`)
 - [ ] Tab strip showing last three sessions; "New Chat" button
 - [ ] Full message thread with streaming SSE rendering
-- [ ] `ProposalCard` adapted for mobile: same Approve / Dismiss flow as desktop
+- [ ] `ProposalCard` adapted for mobile with same Approve/Dismiss flow as desktop
 - [ ] Compose bar pinned to bottom, respects Telegram keyboard inset via `Telegram.WebApp.expand()`
 
-### 4.9 Settings Screen (`/mini-app/settings`)
-- [ ] Full policy editor mirroring the web dashboard policy manager
+### 4.15 Mini App Settings Screen (`/mini-app/settings`)
+- [ ] Full policy editor matching the dashboard policy manager
 - [ ] Notification preferences: alert frequency, minimum gain threshold, quiet hours time picker
 - [ ] Wallet section: shows connected address, option to disconnect
 
-**Phase 4 exit criteria:** A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram.
+**Phase 4 exit criteria:** Full quote-to-approve-to-execute cycle completes in the browser dashboard. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram. Chat panel streams a Mira response and renders a proposal card that executes inline.
 
 ---
 
@@ -309,19 +325,19 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 5.4 Testing
 - [ ] Unit tests: Zod schema validators, cross-session memory builder, policy eligibility checker, x402 middleware
-- [ ] Integration tests: full quote→execute→poll cycle against a real dev MongoDB and mocked Omniston + Mira
-- [ ] E2E tests (Playwright): wallet connect → policy set → rebalance → run history visible; Mini App onboarding flow
-- [ ] Load test: 100 concurrent quote requests; p99 < 2 s
+- [ ] Integration tests: full quote-to-execute-to-poll cycle against a real dev MongoDB with mocked Omniston and Mira
+- [ ] E2E tests (Playwright): wallet connect, policy set, rebalance, run history visible; Mini App onboarding flow
+- [ ] Load test: 100 concurrent quote requests; p99 under 2 s
 
 ### 5.5 Deployment
 - [ ] **Frontend (Vercel):** Production deployment from `main` branch. Mini App URL registered with Telegram via BotFather. Environment variables set in Vercel dashboard.
 - [ ] **Backend (Render):** Production web service + background worker for pool scanner. Health check endpoint at `/health`. Auto-deploy from `main`.
 - [ ] **MongoDB Atlas:** Production cluster in the same region as Render. Network access restricted to Render static outbound IPs.
-- [ ] Domain: `tonyx.app` → Vercel. `api.tonyx.app` → Render. TLS managed by both platforms.
+- [ ] Domain: `tonyx.app` to Vercel. `api.tonyx.app` to Render. TLS managed by both platforms.
 - [ ] Cron endpoint `POST /api/cron/scan` protected by `CRON_SECRET` header; called by Render cron every 60 s.
 
 ### 5.6 Documentation
-- [ ] Swagger UI at `api.tonyx.app/api/docs` — all endpoints documented with JSDoc including request/response examples
+- [ ] Swagger UI at `api.tonyx.app/api/docs` with all endpoints documented via JSDoc including request/response examples
 - [ ] `README.md` in each `apps/` and `packages/` directory: purpose, setup, environment variables
 - [ ] Runbook: how to rotate API keys, handle a failed run, replay a skipped rebalance, soft-delete a user
 
@@ -361,12 +377,9 @@ Implementation is split into five phases. Each phase is independently shippable 
 ## Dependency Map
 
 ```
-Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3
-                  │                        │
-                  └──────────────────────► Phase 4
-                                           │
-                                           ▼
-                                        Phase 5
+Phase 0 --> Phase 1 --> Phase 2 --+
+                  |               |
+                  +-> Phase 3 --+--> Phase 4 --> Phase 5
 ```
 
-Phases 2 and 4 both depend on Phase 1 and can be developed in parallel after Phase 1 is complete. Phase 3 depends on Phase 2 (chat panel is embedded in the dashboard). Phase 5 runs in parallel with late Phase 4 work.
+Phase 2 (AI & Chat Backend) and Phase 3 (Telegram Bot) both depend on Phase 1 and can be developed in parallel. Phase 4 (all frontend) depends on both Phase 2 and Phase 3 being complete. Phase 5 hardening runs in parallel with late Phase 4 work.
