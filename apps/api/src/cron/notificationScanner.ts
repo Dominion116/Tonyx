@@ -1,0 +1,292 @@
+import { randomUUID } from 'crypto';
+import cron from 'node-cron';
+import { buildContext } from '@tonyx/mira';
+import {
+  NotificationModel,
+  PolicyModel,
+  RunModel,
+  UserModel,
+} from '../db/index.js';
+import { getPoolsFromCache } from './poolScanner.js';
+import { fetchBalance } from '../services/tonapi.js';
+import { miraClient } from '../services/mira.js';
+import { savePendingQuote } from '../services/pendingQuotes.js';
+import { trackExecution } from '../services/execution.js';
+import { getBot } from '../telegram/bot.js';
+import { env } from '../env.js';
+
+// In-memory throttle: walletAddress → timestamp of last notification sent
+const lastNotified = new Map<string, Date>();
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function isQuietHour(start: number, end: number): boolean {
+  const hour = new Date().getUTCHours();
+  // start > end means overnight range e.g. 22–8
+  return start <= end
+    ? hour >= start && hour < end
+    : hour >= start || hour < end;
+}
+
+function shouldThrottle(walletAddress: string, frequency: string): boolean {
+  const last = lastNotified.get(walletAddress);
+  if (!last) return false;
+  const elapsed = Date.now() - last.getTime();
+  if (frequency === 'hourly') return elapsed < 60 * 60 * 1_000;
+  if (frequency === 'daily') return elapsed < 24 * 60 * 60 * 1_000;
+  return false; // 'immediate' — only the 60 s scanner interval acts as throttle
+}
+
+function markNotified(walletAddress: string): void {
+  lastNotified.set(walletAddress, new Date());
+}
+
+// ─── Per-wallet scan ──────────────────────────────────────────────────────────
+
+async function scanWallet(
+  walletAddress: string,
+  telegramUserId: string,
+  alertFrequency: string,
+  quietHoursStart: number,
+  quietHoursEnd: number,
+): Promise<void> {
+  if (isQuietHour(quietHoursStart, quietHoursEnd)) return;
+  if (shouldThrottle(walletAddress, alertFrequency)) return;
+
+  // Fetch policy
+  const policy = await PolicyModel.findOne({ walletAddress })
+    .sort({ version: -1 })
+    .lean();
+  if (!policy) return;
+
+  // Check cooldown
+  const lastRun = await RunModel.findOne({
+    walletAddress,
+    status: { $in: ['completed', 'executing'] },
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (lastRun) {
+    const elapsed = (Date.now() - new Date(lastRun.createdAt).getTime()) / 1_000;
+    if (elapsed < policy.cooldownSeconds) return;
+  }
+
+  // Get pools and balance
+  const cache = await getPoolsFromCache().catch(() => null);
+  const pools = (cache?.pools ?? [])
+    .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent < 500_000)
+    .sort((a, b) => b.aprPercent - a.aprPercent);
+  if (pools.length === 0) return;
+
+  const balance = await fetchBalance(walletAddress).catch(() => null);
+  if (!balance) return;
+
+  const topPool = pools[0];
+  const idleAmount = Math.max(balance.idleUsdt - policy.spendingFloorUsdt, 0);
+  if (idleAmount <= 0) return;
+
+  const dailyYield = (idleAmount * topPool.aprPercent) / 100 / 365;
+  const netGain = parseFloat((dailyYield - env.x402FeeUsdt).toFixed(4));
+  if (netGain < policy.minNetGainUsdt) return;
+
+  // Mira evaluation
+  const miraContext = buildContext({
+    pools: pools.slice(0, 20),
+    topQuote: {
+      originPool: 'idle USDT',
+      destinationPool: topPool.name,
+      routedAmountUsdt: idleAmount,
+      estimatedYieldUsdt: dailyYield,
+      bridgeCostUsdt: topPool.isCrosschain ? 0.5 : 0,
+      x402FeeUsdt: env.x402FeeUsdt,
+      netGainUsdt: netGain,
+    },
+    policy: {
+      minNetGainUsdt: policy.minNetGainUsdt,
+      cooldownSeconds: policy.cooldownSeconds,
+      spendingFloorUsdt: policy.spendingFloorUsdt,
+      eligibleAssets: policy.eligibleAssets,
+      approvalMode: policy.approvalMode as 'auto' | 'manual',
+    },
+    balance: { idleUsdt: balance.idleUsdt, deployedUsdt: balance.deployedUsdt },
+    recentRuns: [],
+  });
+
+  const rec = await miraClient.evaluate(miraContext).catch(() => ({
+    proceed: true,
+    confidence: 0.7,
+    explanation: `${topPool.name} at ${topPool.aprPercent.toFixed(2)}% APR — net gain $${netGain}.`,
+    suggestedAction: `Rebalance $${idleAmount.toFixed(2)} into ${topPool.name}`,
+  }));
+
+  if (!rec.proceed) return;
+
+  markNotified(walletAddress);
+
+  if (policy.approvalMode === 'auto') {
+    await dispatchAutoExecute(
+      walletAddress,
+      telegramUserId,
+      topPool.name,
+      idleAmount,
+      dailyYield,
+      netGain,
+      rec.explanation,
+    );
+  } else {
+    await dispatchManualApproval(
+      walletAddress,
+      telegramUserId,
+      topPool.name,
+      idleAmount,
+      dailyYield,
+      netGain,
+      rec.explanation,
+      rec.confidence,
+    );
+  }
+}
+
+// ─── Dispatch: manual approval ────────────────────────────────────────────────
+
+async function dispatchManualApproval(
+  walletAddress: string,
+  telegramUserId: string,
+  poolName: string,
+  amount: number,
+  estimatedYield: number,
+  netGain: number,
+  explanation: string,
+  confidence: number,
+): Promise<void> {
+  const approvalToken = randomUUID();
+  savePendingQuote(approvalToken, {
+    walletAddress,
+    omnistonQuote: null!,
+    originPool: 'idle USDT',
+    destinationPool: poolName,
+    routedAmountUsdt: amount,
+    estimatedYieldUsdt: estimatedYield,
+    x402FeeUsdt: env.x402FeeUsdt,
+    netGainUsdt: netGain,
+    expiresAt: Date.now() + 10 * 60 * 1_000,
+  });
+
+  const msg =
+    `💡 *Rebalance Opportunity* (${(confidence * 100).toFixed(0)}% confidence)\n\n` +
+    `${explanation}\n\n` +
+    `*Route:* idle USDT → ${poolName}\n` +
+    `*Amount:* $${amount.toFixed(2)}\n` +
+    `*Est. daily yield:* $${estimatedYield.toFixed(4)}\n` +
+    `*Fee:* $${env.x402FeeUsdt.toFixed(2)}\n` +
+    `*Net gain:* $${netGain.toFixed(4)}`;
+
+  try {
+    const bot = getBot();
+    await bot.telegram.sendMessage(telegramUserId, msg, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '✅ Approve', callback_data: `approve_${approvalToken}` },
+            { text: '❌ Dismiss', callback_data: `dismiss_${approvalToken}` },
+          ],
+        ],
+      },
+    });
+  } catch (err) {
+    console.error(`[notify] Failed to send manual proposal to ${telegramUserId}:`, err);
+  }
+}
+
+// ─── Dispatch: auto-execute ───────────────────────────────────────────────────
+
+async function dispatchAutoExecute(
+  walletAddress: string,
+  telegramUserId: string,
+  poolName: string,
+  amount: number,
+  estimatedYield: number,
+  netGain: number,
+  explanation: string,
+): Promise<void> {
+  const approvalToken = randomUUID();
+
+  try {
+    const now = new Date();
+    const run = await RunModel.create({
+      walletAddress,
+      status: 'executing',
+      originPool: 'idle USDT',
+      destinationPool: poolName,
+      routedAmountUsdt: amount,
+      yieldEarnedUsdt: 0,
+      x402FeeUsdt: env.x402FeeUsdt,
+      approvalToken,
+      createdAt: now,
+    });
+
+    const bot = getBot();
+    await bot.telegram.sendMessage(
+      telegramUserId,
+      `⚙️ *Auto-rebalancing…*\n\n${explanation}`,
+      { parse_mode: 'Markdown' },
+    );
+
+    // Track and send confirmation when done
+    trackExecution(run._id, walletAddress, now.getTime())
+      .then(() =>
+        RunModel.findById(run._id)
+          .lean()
+          .then((r) => {
+            if (!r) return;
+            const txLink = r.txHash
+              ? ` · [tx](https://tonviewer.com/transaction/${r.txHash})`
+              : '';
+            const msg =
+              r.status === 'completed'
+                ? `✅ *Rebalanced!* Earned $${r.yieldEarnedUsdt.toFixed(4)} · fee $${r.x402FeeUsdt.toFixed(2)}${txLink}`
+                : `❌ *Auto-rebalance failed.* Check /status and try /rebalance manually.`;
+            return bot.telegram.sendMessage(telegramUserId, msg, {
+              parse_mode: 'Markdown',
+              link_preview_options: { is_disabled: true },
+            });
+          }),
+      )
+      .catch(() => {});
+  } catch (err) {
+    console.error(`[notify] Auto-execute failed for ${walletAddress}:`, err);
+  }
+}
+
+// ─── Main scanner loop ────────────────────────────────────────────────────────
+
+export async function runNotificationScan(): Promise<void> {
+  if (!env.telegramBotToken) return; // bot not configured
+
+  try {
+    const prefs = await NotificationModel.find({
+      telegramUserId: { $exists: true, $ne: '' },
+    }).lean();
+
+    await Promise.allSettled(
+      prefs.map((p) =>
+        scanWallet(
+          p.walletAddress,
+          p.telegramUserId,
+          p.alertFrequency,
+          p.quietHoursStart,
+          p.quietHoursEnd,
+        ),
+      ),
+    );
+  } catch (err) {
+    console.error('[notification-scanner] Scan error:', err);
+  }
+}
+
+export function startNotificationScanner(): void {
+  cron.schedule('*/1 * * * *', () => void runNotificationScan());
+  console.log('[notification-scanner] Started (60 s interval)');
+}

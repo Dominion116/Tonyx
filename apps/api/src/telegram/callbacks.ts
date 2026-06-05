@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import type { Context } from 'telegraf';
 import { RunModel } from '../db/index.js';
 import { consumePendingQuote } from '../services/pendingQuotes.js';
@@ -77,7 +78,23 @@ async function handleApprove(ctx: Context, approvalToken: string): Promise<void>
 }
 
 async function handleDismiss(ctx: Context, approvalToken: string): Promise<void> {
-  consumePendingQuote(approvalToken); // evict if not already consumed
+  const pending = consumePendingQuote(approvalToken);
+
+  if (pending) {
+    // Record the skip so the run history reflects the dismissal
+    await RunModel.create({
+      walletAddress: pending.walletAddress,
+      status: 'skipped',
+      originPool: pending.originPool,
+      destinationPool: pending.destinationPool,
+      routedAmountUsdt: pending.routedAmountUsdt,
+      yieldEarnedUsdt: 0,
+      x402FeeUsdt: 0,
+      approvalToken: randomUUID(), // new token — the original was consumed above
+      createdAt: new Date(),
+      completedAt: new Date(),
+    }).catch(() => {}); // best-effort; don't fail the dismiss if DB is down
+  }
 
   await ctx.editMessageText(
     '⏭️ Proposal dismissed. Tonyx will keep watching for the next opportunity.',
