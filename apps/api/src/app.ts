@@ -9,6 +9,7 @@ import walletRouter from './routes/wallet.js';
 import balanceRouter from './routes/balance.js';
 import poolsRouter from './routes/pools.js';
 import policyRouter from './routes/policy.js';
+import agentRouter from './routes/agent.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -43,6 +44,7 @@ export function createApp(): express.Application {
   app.use('/api/balance', balanceRouter);
   app.use('/api/pools', poolsRouter);
   app.use('/api/policy', policyRouter);
+  app.use('/api/agent', agentRouter);
 
   // 404 catch-all for unmatched /api/* paths
   app.use('/api', (_req, res) => {
