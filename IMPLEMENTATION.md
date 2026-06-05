@@ -191,12 +191,22 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ## Phase 4 — Frontend & UI
 
-**Goal:** Web dashboard and Telegram Mini App WebView are fully functional, consuming the complete backend built in Phases 1-3.
+**Goal:** Landing page, web dashboard, and Telegram Mini App WebView are fully functional, consuming the complete backend built in Phases 1-3. The landing page hero defines the global theme for the entire frontend.
+
+**Route structure:** `/` is the public landing page (marketing). The dashboard entry point is `/dashboard` (which redirects to `/dashboard/overview`). The Mini App lives under `/mini-app`.
+
+### 4.0 Landing Page (`/`)
+- [ ] Install hero dependencies in `apps/web`: `three`, `@react-three/fiber`, `@react-three/drei`, `lucide-react`, plus `@types/three` (dev)
+- [ ] Place the Ethereal Beams Hero component at `apps/web/components/ui/ethereal-beams-hero.tsx` (provided template), changing only brand name and CTA copy for Tonyx
+- [ ] `(marketing)` route group with a minimal layout — no auth, no sidebar, no dock
+- [ ] **The hero's design tokens are the global theme** — pure black/white glassmorphic: `background #000000`, `foreground #ffffff`, `surface rgba(255,255,255,0.05)`, `border rgba(255,255,255,0.10)`, `muted rgba(255,255,255,0.60)`, pill radius for interactive elements, `backdrop-blur-xl`. These are written into `tailwind.config.ts` and `globals.css` as CSS custom properties and consumed by every page
+- [ ] Landing sections: glassmorphic navbar (Tonyx brand, pill nav, "Launch app" CTA) · hero with animated 3D beams (heading "Your yield, automated", subtitle, "Launch app" → `/dashboard` and "Open in Telegram" deep link) · "Powered by Mira AI · Built on TON" badge · stats row · 3-column features (Autonomous scanning / Mira AI reasoning / x402 micropayments) · "How it works" 4 steps (Connect wallet → Set policy → Agent executes → You earn) · CTA band · footer
 
 ### 4.1 Next.js 14 App Setup (`apps/web`)
 - [ ] App Router with TypeScript strict mode
-- [ ] `shadcn/ui` init + Tailwind CSS configured with a neutral base theme
-- [ ] Two layout groups: `(dashboard)` for the web dashboard, `(mini-app)` for the Telegram Mini App WebView
+- [ ] `shadcn/ui` init + Tailwind CSS theme derived from the hero design tokens (§4.0) — no component hardcodes a color value; all pages (landing, dashboard, Mini App) consume the shared tokens
+- [ ] Three layout groups: `(marketing)` for the landing page, `(dashboard)` for the web dashboard, `(mini-app)` for the Telegram Mini App WebView
+- [ ] Shared `Dock` component (`components/layout/Dock.tsx`) with a single `NavItems` data source — used by the dashboard on mobile (`< md`) and always by the Mini App; styling matches the global black/white theme with `env(safe-area-inset-bottom)` padding
 - [ ] API client module (typed fetch wrapper) using types from `packages/shared` — import with `import type { ... }` only; never import Zod schemas or runtime values into web components
 - [ ] Form validation replicated inline (no shared Zod import in client components)
 
@@ -207,14 +217,14 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] On connect: call `POST /api/wallet/connect`, store JWT in `httpOnly` cookie via Next.js Route Handler
 - [ ] Persist connection across sessions; auto-reconnect on page load if cookie is valid
 
-### 4.3 Portfolio Overview Page (`/`)
+### 4.3 Portfolio Overview Page (`/dashboard/overview`)
 - [ ] Fetch balance from `GET /api/balance/:address`; show TON, USDT, and LP token balances in cards
 - [ ] Active pool positions table: pool name, deposited amount, current APR
 - [ ] Lifetime yield earned (sum of `yieldEarnedUsdt` across completed runs)
 - [ ] Total x402 fees paid (sum of `x402FeeUsdt` across completed runs)
 - [ ] 30-second polling with SWR or React Query; optimistic refresh after execute
 
-### 4.4 Yield Scanner Page (`/scanner`)
+### 4.4 Yield Scanner Page (`/dashboard/scanner`)
 - [ ] Fetch pool list from `GET /api/pools`
 - [ ] Ranked table: pool name, asset pair, APR, liquidity depth, estimated net gain for user's idle balance
 - [ ] Crosschain opportunities flagged with estimated bridge cost and net gain after all fees
@@ -228,13 +238,13 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Polls `GET /api/agent/runs/:id/status` and updates modal state (`pending -> executing -> completed`)
 - [ ] On completion: toast notification with yield earned; invalidates balance and runs caches
 
-### 4.6 Policy Manager Page (`/policy`)
+### 4.6 Policy Manager Page (`/dashboard/policy`)
 - [ ] Form fields: minimum net gain, cooldown period, spending floor, eligible assets (multi-select), approval mode toggle
 - [ ] Client-side validation written inline (not imported from `packages/shared`)
 - [ ] Wallet signature required on submit via TON AppKit
 - [ ] Policy version history table: version number, changed fields diff, timestamp
 
-### 4.7 Run History Page (`/history`)
+### 4.7 Run History Page (`/dashboard/history`)
 - [ ] Paginated table of all runs: timestamp, origin pool, destination pool, amount, yield earned, x402 fee, status
 - [ ] Link to TON explorer for each completed run via `txHash`
 - [ ] Separate "Skipped" tab for dismissed opportunities
@@ -251,8 +261,8 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 4.9 Telegram Mini App WebView (`apps/web/app/(mini-app)/`)
 - [ ] Separate Next.js route group with Telegram Mini App SDK initialised
-- [ ] Apply Telegram theme variables to Tailwind: `--tg-theme-bg-color`, `--tg-theme-button-color`, etc.
-- [ ] Compact layout with bottom navigation: Home, Scanner, Chat, Settings
+- [ ] Global black/white theme tokens (§4.0) applied; Telegram theme variables (`--tg-theme-bg-color`, `--tg-theme-button-color`, etc.) layered on top where the WebView provides them
+- [ ] Compact layout with the shared **Dock** component (§4.1) pinned to the bottom, 4 items: Home · Scanner · Chat · Settings; active item uses the primary token, icon scales up, iOS-style active indicator; `env(safe-area-inset-bottom)` padding respects the iPhone home bar
 - [ ] Back-button handled via `Telegram.WebApp.BackButton`
 
 ### 4.10 Onboarding Flow (`/mini-app/onboard`)
@@ -293,7 +303,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Notification preferences: alert frequency, minimum gain threshold, quiet hours time picker
 - [ ] Wallet section: shows connected address, option to disconnect
 
-**Phase 4 exit criteria:** Full quote-to-approve-to-execute cycle completes in the browser dashboard. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram. Chat panel streams a Mira response and renders a proposal card that executes inline.
+**Phase 4 exit criteria:** The landing page renders at `/` with the animated 3D beams hero, and its design tokens drive the theme across every page. The full quote-to-approve-to-execute cycle completes in the browser dashboard at `/dashboard`, with the Dock appearing on mobile viewports (`< md`) and the sidebar on desktop. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram, navigating via the Dock. Chat panel streams a Mira response and renders a proposal card that executes inline.
 
 ---
 

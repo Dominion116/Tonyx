@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Global theme tokens — pure black / white glassmorphic (from hero §4.0).
+       Values are HSL channels so Tailwind's <alpha-value> works. */
+    --background: 0 0% 0%;          /* #000000 */
+    --foreground: 0 0% 100%;        /* #ffffff */
+    --surface: 0 0% 100%;           /* white base; opacity applied at usage */
+    --border: 0 0% 100%;            /* white base; opacity applied at usage */
+    --muted: 0 0% 60%;              /* rgba(255,255,255,0.60) tone */
+    --muted-foreground: 0 0% 80%;   /* rgba(255,255,255,0.80) tone */
+    --primary: 0 0% 100%;           /* white CTA */
+    --primary-foreground: 0 0% 0%;  /* black text on white CTA */
+  }
+
+  * {
+    border-color: hsl(var(--border) / 0.1);
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* Telegram Mini App theme variables layer on top where the WebView provides them */
+@layer base {
+  .tg-theme {
+    --background: var(--tg-theme-bg-color, 0 0% 0%);
+  }
+}
