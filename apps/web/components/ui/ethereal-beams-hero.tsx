@@ -480,36 +480,38 @@ export default function EtherealBeamsHero() {
       {/* Glassmorphic Navbar */}
       <nav className="relative z-20 w-full">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            {/* Brand */}
+          <div className="grid grid-cols-3 h-16 items-center">
+            {/* Brand — left column */}
             <div className="flex items-center">
               <span className="text-xl font-bold text-white">Tonyx</span>
             </div>
 
-            {/* Glassmorphic Navigation Pills */}
-            <div className="hidden md:flex items-center space-x-1 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 p-1 -mr-6">
-              <a
-                href="#features"
-                className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
-              >
-                How it works
-              </a>
-              <a
-                href="/dashboard"
-                className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
-              >
-                Dashboard
-              </a>
+            {/* Glassmorphic Navigation Pills — truly centered */}
+            <div className="hidden md:flex justify-center">
+              <div className="flex items-center space-x-1 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 p-1">
+                <a
+                  href="#features"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                >
+                  Features
+                </a>
+                <a
+                  href="#how-it-works"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                >
+                  How it works
+                </a>
+                <a
+                  href="/dashboard"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                >
+                  Dashboard
+                </a>
+              </div>
             </div>
 
-            {/* CTA Button */}
-            <div className="flex items-center space-x-4">
+            {/* CTA — right column, aligned to end */}
+            <div className="flex items-center justify-end space-x-4">
               <a href="https://github.com" target="_blank" rel="noreferrer">
                 <Button variant="ghost" size="sm" className="hidden sm:flex">
                   <GitFork className="mr-2 h-4 w-4" />
@@ -528,8 +530,8 @@ export default function EtherealBeamsHero() {
       </nav>
 
       {/* Hero Content */}
-      <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center">
-        <div className="mx-auto max-w-7xl px-6 lg:px-8">
+      <div className="relative z-10 flex min-h-[calc(100vh-4rem)] items-center w-full">
+        <div className="mx-auto w-full max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
             {/* Badge */}
             <div className="mb-8 inline-flex items-center rounded-full bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-2 text-sm text-white/90">
