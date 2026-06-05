@@ -1,2 +1,15 @@
-// Mira AI client adapter — populated in Phase 0.4
-export {};
+export { MiraClient } from './client.js';
+export { buildContext } from './context.js';
+export type {
+  MiraContext,
+  MiraRecommendation,
+  ChatMessage,
+  ChatStream,
+  MiraClientConfig,
+  ContextBuilderInput,
+  PoolSnapshot,
+  QuoteSnapshot,
+  PolicySnapshot,
+  BalanceSnapshot,
+  RunSnapshot,
+} from './types.js';
