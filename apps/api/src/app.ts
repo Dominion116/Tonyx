@@ -11,6 +11,7 @@ import poolsRouter from './routes/pools.js';
 import policyRouter from './routes/policy.js';
 import agentRouter from './routes/agent.js';
 import notificationsRouter from './routes/notifications.js';
+import chatRouter from './routes/chat.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -47,6 +48,7 @@ export function createApp(): express.Application {
   app.use('/api/policy', policyRouter);
   app.use('/api/agent', agentRouter);
   app.use('/api/notifications', notificationsRouter);
+  app.use('/api/chat', chatRouter);
 
   // 404 catch-all for unmatched /api/* paths
   app.use('/api', (_req, res) => {
