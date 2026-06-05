@@ -25,6 +25,15 @@
     color: hsl(var(--foreground));
     -webkit-font-smoothing: antialiased;
   }
+
+  ::-webkit-scrollbar {
+    display: none;
+  }
+
+  html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 }
 
 /* Telegram Mini App theme variables layer on top where the WebView provides them */
