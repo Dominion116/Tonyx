@@ -5,6 +5,10 @@ import { env } from './env.js';
 import { errorHandler } from './middleware/error.js';
 import { createSwaggerRouter } from './swagger.js';
 import healthRouter from './routes/health.js';
+import walletRouter from './routes/wallet.js';
+import balanceRouter from './routes/balance.js';
+import poolsRouter from './routes/pools.js';
+import policyRouter from './routes/policy.js';
 
 export function createApp(): express.Application {
   const app = express();
@@ -35,8 +39,12 @@ export function createApp(): express.Application {
   // ── Routes ───────────────────────────────────────────────────────────────
   app.use('/health', healthRouter);
   app.use('/api/docs', createSwaggerRouter());
+  app.use('/api/wallet', walletRouter);
+  app.use('/api/balance', balanceRouter);
+  app.use('/api/pools', poolsRouter);
+  app.use('/api/policy', policyRouter);
 
-  // Placeholder — routers added in subsequent phases mount here under /api
+  // 404 catch-all for unmatched /api/* paths
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
   });
