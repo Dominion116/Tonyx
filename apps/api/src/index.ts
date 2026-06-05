@@ -1,6 +1,10 @@
-// Tonyx API entry point — scaffolded in Phase 1
 import 'dotenv/config';
+import { createApp } from './app.js';
+import { env } from './env.js';
 
-const PORT = process.env.PORT ?? 4000;
+const app = createApp();
 
-console.log(`Tonyx API starting on port ${PORT}`);
+app.listen(env.port, () => {
+  console.log(`Tonyx API listening on http://localhost:${env.port}`);
+  console.log(`Swagger UI: http://localhost:${env.port}/api/docs`);
+});
