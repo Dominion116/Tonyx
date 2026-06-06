@@ -443,7 +443,7 @@ export default function EtherealBeamsHero() {
       {/* Glassmorphic Navbar */}
       <nav className="relative z-20 w-full">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="grid grid-cols-3 h-16 items-center">
+          <div className="flex h-16 items-center md:grid md:grid-cols-3">
             {/* Brand: left column */}
             <div className="flex items-center">
               <span className="text-xl font-bold text-white">Tonyx</span>
@@ -474,7 +474,7 @@ export default function EtherealBeamsHero() {
             </div>
 
             {/* CTA: right column, aligned to end */}
-            <div className="flex items-center justify-end gap-3">
+            <div className="ml-auto flex items-center justify-end gap-3 md:ml-0">
               <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
                 <a href="https://github.com" target="_blank" rel="noreferrer">
                   <GitFork className="h-4 w-4" aria-hidden="true" />

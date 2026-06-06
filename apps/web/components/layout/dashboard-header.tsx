@@ -1,10 +1,12 @@
 'use client';
 
-import { PanelLeft, Search } from 'lucide-react';
+import { MessageSquare, PanelLeft, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { navItems } from '@/components/layout/nav-items';
 import { useSidebar } from '@/components/layout/sidebar-context';
+import { useChatPanel } from '@/components/chat/chat-panel-context';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 /**
  * Sticky top bar adapted from the admin template: sidebar toggles, a search
@@ -12,7 +14,8 @@ import { Button } from '@/components/ui/button';
  */
 export function DashboardHeader() {
   const pathname = usePathname();
-  const { toggleExpanded, toggleMobile } = useSidebar();
+  const { toggleExpanded } = useSidebar();
+  const { toggle: toggleChat, isOpen: isChatOpen } = useChatPanel();
 
   const current =
     navItems.find(
@@ -33,9 +36,10 @@ export function DashboardHeader() {
 
       <h1 className="text-base font-semibold text-white">{current}</h1>
 
-      {/* Search */}
-      <div className="ml-auto hidden items-center md:flex">
-        <div className="relative">
+      {/* Right cluster */}
+      <div className="ml-auto flex items-center gap-2 md:gap-3">
+        {/* Search */}
+        <div className="relative hidden md:block">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
             aria-hidden="true"
@@ -46,11 +50,24 @@ export function DashboardHeader() {
             className="h-10 w-56 rounded-full border border-white/10 bg-white/5 pl-9 pr-4 text-sm text-white placeholder:text-muted-foreground focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/20 lg:w-72"
           />
         </div>
-      </div>
 
-      <Button size="sm" className="ml-auto">
-        Connect wallet
-      </Button>
+        {/* Chat toggle */}
+        <button
+          onClick={toggleChat}
+          aria-label="Toggle chat"
+          aria-pressed={isChatOpen}
+          className={cn(
+            'flex h-10 w-10 items-center justify-center rounded-lg border transition-colors',
+            isChatOpen
+              ? 'border-accent/40 bg-accent/15 text-accent'
+              : 'border-white/10 text-white/70 hover:bg-white/5 hover:text-white'
+          )}
+        >
+          <MessageSquare className="h-5 w-5" aria-hidden="true" />
+        </button>
+
+        <Button size="sm">Connect wallet</Button>
+      </div>
     </header>
   );
 }
