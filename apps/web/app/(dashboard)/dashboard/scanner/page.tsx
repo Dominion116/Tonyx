@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { RebalanceButton } from '@/components/quote/rebalance-button';
 import {
   Table,
   TableBody,
@@ -58,7 +58,9 @@ export default function ScannerPage() {
                 <TableCell>{pool.liquidity}</TableCell>
                 <TableCell className="text-emerald-400">{pool.netGain}</TableCell>
                 <TableCell className="text-right">
-                  <Button size="sm">Rebalance now</Button>
+                  <RebalanceButton
+                    pool={{ pair: pool.pair, apr: pool.apr, netGain: pool.netGain }}
+                  />
                 </TableCell>
               </TableRow>
             ))}
