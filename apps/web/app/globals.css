@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Global theme tokens — pure black / white glassmorphic (from hero §4.0).
+    /* Global theme tokens: pure black / white glassmorphic (from hero §4.0).
        Values are HSL channels so Tailwind's <alpha-value> works. */
     --background: 0 0% 0%;          /* #000000 */
     --foreground: 0 0% 100%;        /* #ffffff */
@@ -14,8 +14,11 @@
     --muted-foreground: 0 0% 80%;   /* rgba(255,255,255,0.80) tone */
     --primary: 0 0% 100%;           /* white CTA */
     --primary-foreground: 0 0% 0%;  /* black text on white CTA */
+    --accent: 201 100% 46%;         /* TON blue #0098EA */
+    --accent-foreground: 0 0% 100%; /* white text on TON blue */
     /* Full rgba value for inline styles (e.g. BackgroundPattern) */
     --color-border: rgba(255, 255, 255, 0.1);
+    --color-accent: rgba(0, 152, 234, 1); /* TON blue */
   }
 
   * {

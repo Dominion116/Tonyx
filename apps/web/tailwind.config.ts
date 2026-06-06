@@ -23,6 +23,11 @@ const config: Config = {
           DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
           foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
         },
+        // TON blue accent (#0098EA) used across the frontend
+        accent: {
+          DEFAULT: 'hsl(var(--accent) / <alpha-value>)',
+          foreground: 'hsl(var(--accent-foreground) / <alpha-value>)',
+        },
       },
       borderRadius: {
         pill: '9999px',

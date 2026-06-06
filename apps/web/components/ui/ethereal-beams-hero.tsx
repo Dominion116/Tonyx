@@ -416,7 +416,7 @@ const Beams: FC<BeamsProps> = ({
 // ============================================================================
 
 /**
- * Tonyx Hero — Ethereal Beams
+ * Tonyx Hero: Ethereal Beams
  *
  * Animated 3D light beams with glassmorphic navigation. Defines the global
  * black & white theme for the entire Tonyx frontend.
@@ -432,7 +432,7 @@ export default function EtherealBeamsHero() {
           beamWidth={2.5}
           beamHeight={18}
           beamNumber={15}
-          lightColor="#ffffff"
+          lightColor="#0098EA"
           speed={2.5}
           noiseIntensity={2}
           scale={0.15}
@@ -444,12 +444,12 @@ export default function EtherealBeamsHero() {
       <nav className="relative z-20 w-full">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="grid grid-cols-3 h-16 items-center">
-            {/* Brand — left column */}
+            {/* Brand: left column */}
             <div className="flex items-center">
               <span className="text-xl font-bold text-white">Tonyx</span>
             </div>
 
-            {/* Glassmorphic Navigation Pills — truly centered */}
+            {/* Glassmorphic Navigation Pills: truly centered */}
             <div className="hidden md:flex justify-center">
               <div className="flex items-center space-x-1 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 p-1">
                 <a
@@ -473,7 +473,7 @@ export default function EtherealBeamsHero() {
               </div>
             </div>
 
-            {/* CTA — right column, aligned to end */}
+            {/* CTA: right column, aligned to end */}
             <div className="flex items-center justify-end gap-3">
               <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
                 <a href="https://github.com" target="_blank" rel="noreferrer">
@@ -497,15 +497,15 @@ export default function EtherealBeamsHero() {
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
             {/* Badge */}
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-2 text-sm text-white/90">
-              <Star className="h-4 w-4 text-white" aria-hidden="true" />
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-accent/10 backdrop-blur-xl border border-accent/20 px-4 py-2 text-sm text-white/90">
+              <Star className="h-4 w-4 text-accent" aria-hidden="true" />
               {"Powered by Mira AI · Built on TON"}
             </div>
 
             {/* Main Heading */}
             <h1 className="mb-6 text-4xl font-bold tracking-tight text-white sm:text-6xl lg:text-7xl">
               Your yield,{" "}
-              <span className="bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-white via-[#5ab8f0] to-[#0098EA] bg-clip-text text-transparent">
                 automated
               </span>
               <br />
@@ -515,12 +515,12 @@ export default function EtherealBeamsHero() {
             {/* Subtitle */}
             <p className="mb-10 text-lg leading-8 text-white/80 sm:text-xl lg:text-2xl max-w-3xl mx-auto">
               Tonyx is an autonomous agent that scans STON.fi pools, reasons with Mira AI, and rebalances your idle
-              USDT — only within the limits you set. No monitoring. No manual swaps.
+              USDT, only within the limits you set. No monitoring. No manual swaps.
             </p>
 
             {/* CTA Buttons */}
             <div className="mb-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button asChild size="lg" className="w-full shadow-2xl shadow-white/25 sm:w-auto">
+              <Button asChild size="lg" className="w-full shadow-2xl shadow-accent/40 sm:w-auto">
                 <a href="/dashboard">
                   Launch app
                   <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -536,15 +536,15 @@ export default function EtherealBeamsHero() {
             {/* Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-2xl mx-auto">
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">STON.fi</div>
+                <div className="text-3xl font-bold text-accent mb-2">STON.fi</div>
                 <div className="text-white/60 text-sm">Pools scanned every 60s</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">Mira AI</div>
+                <div className="text-3xl font-bold text-accent mb-2">Mira AI</div>
                 <div className="text-white/60 text-sm">Every move explained</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-white mb-2">x402</div>
+                <div className="text-3xl font-bold text-accent mb-2">x402</div>
                 <div className="text-white/60 text-sm">Pay only when you earn</div>
               </div>
             </div>

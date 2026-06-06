@@ -32,7 +32,7 @@ const capabilities = [
   {
     title: 'Net-gain ranking',
     description:
-      'Every opportunity is scored on real profit after swap fees, gas, and slippage — not headline APY.',
+      'Every opportunity is scored on real profit after swap fees, gas, and slippage, not headline APY.',
     icon: TrendingUp,
   },
   {
@@ -56,7 +56,7 @@ const capabilities = [
   {
     title: 'x402 micropayments',
     description:
-      'A small, transparent fee per executed rebalance. No subscriptions, no spreads — pay only on results.',
+      'A small, transparent fee per executed rebalance. No subscriptions, no spreads. Pay only on results.',
     icon: Coins,
   },
 ];
@@ -83,7 +83,7 @@ const faqs = [
   {
     question: 'What does it cost?',
     answer:
-      'A small, transparent x402 micropayment per executed rebalance. No subscriptions and no hidden spreads — the agent earns only when you earn.',
+      'A small, transparent x402 micropayment per executed rebalance. No subscriptions and no hidden spreads. The agent earns only when you earn.',
     icon: Coins,
   },
   {
@@ -116,7 +116,7 @@ const footerSocials = [
 export default function LandingPage() {
   return (
     <main className="bg-black text-white">
-      {/* Hero — defines the global theme */}
+      {/* Hero: defines the global theme */}
       <EtherealBeamsHero />
 
       {/* Capabilities grid */}
@@ -139,7 +139,7 @@ export default function LandingPage() {
               className="relative -m-px border border-white/10 bg-black px-6 py-7"
               key={feature.title}
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/5 text-white">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent ring-1 ring-accent/20">
                 <feature.icon className="h-5 w-5" aria-hidden="true" />
               </div>
               <h3 className="mt-5 text-lg font-medium tracking-tight">
@@ -173,7 +173,7 @@ export default function LandingPage() {
           </p>
         </div>
 
-        <div className="mx-auto mt-16 max-w-2xl">
+        <div className="mt-16">
           <Accordion className="space-y-4" collapsible type="single">
             {faqs.map((faq) => (
               <AccordionItem
@@ -183,7 +183,7 @@ export default function LandingPage() {
               >
                 <AccordionTrigger className="text-base sm:text-lg">
                   <span className="flex items-center gap-3">
-                    <faq.icon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <faq.icon className="h-5 w-5 shrink-0 text-accent" aria-hidden="true" />
                     {faq.question}
                   </span>
                 </AccordionTrigger>
