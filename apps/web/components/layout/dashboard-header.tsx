@@ -4,7 +4,7 @@ import { PanelLeft, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { navItems } from '@/components/layout/nav-items';
 import { useSidebar } from '@/components/layout/sidebar-context';
-import { Button } from '@/components/ui/button';
+import { WalletButton } from '@/components/wallet/wallet-button';
 
 /**
  * Sticky top bar adapted from the admin template: sidebar toggles, a search
@@ -48,7 +48,7 @@ export function DashboardHeader() {
           />
         </div>
 
-        <Button size="sm">Connect wallet</Button>
+        <WalletButton />
       </div>
     </header>
   );
