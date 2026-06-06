@@ -1,5 +1,5 @@
 import { PolicyView } from '@/components/views/policy-view';
 
-export default function PolicyPage() {
+export default function MiniAppSettings() {
   return <PolicyView />;
 }

@@ -4,6 +4,8 @@ import {
   MessageSquare,
   SlidersHorizontal,
   History,
+  Home,
+  Settings,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -50,4 +52,15 @@ export const navItems: NavItem[] = [
     href: '/dashboard/history',
     icon: History,
   },
+];
+
+/**
+ * Telegram Mini App navigation. Mirrors the dashboard's mobile experience but
+ * points at the compact `/mini-app` routes. Consumed by the shared Dock.
+ */
+export const miniAppNavItems: NavItem[] = [
+  { name: 'Home', shortName: 'Home', href: '/mini-app', icon: Home },
+  { name: 'Scanner', shortName: 'Scanner', href: '/mini-app/scanner', icon: Radar },
+  { name: 'Chat', shortName: 'Chat', href: '/mini-app/chat', icon: MessageSquare },
+  { name: 'Settings', shortName: 'Settings', href: '/mini-app/settings', icon: Settings },
 ];

@@ -2,26 +2,42 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { navItems } from '@/components/layout/nav-items';
+import { navItems, type NavItem } from '@/components/layout/nav-items';
 import { cn } from '@/lib/utils';
 
 /**
- * Floating bottom dock for mobile (< lg). Shares the single `navItems` source
- * with the desktop sidebar. Glassmorphic pill that respects the iOS home bar
- * via env(safe-area-inset-bottom).
+ * Floating bottom dock. Shared by the dashboard (mobile only) and the Mini App
+ * (always visible). Glassmorphic pill that respects the iOS home bar via
+ * env(safe-area-inset-bottom).
  */
-export function Dock() {
+export function Dock({
+  items = navItems,
+  alwaysShow = false,
+}: {
+  items?: NavItem[];
+  alwaysShow?: boolean;
+}) {
   const pathname = usePathname();
+
+  // Active item is the one whose href is the longest matching prefix, so a
+  // parent route like "/mini-app" does not stay active on its sub-routes.
+  const activeHref = items
+    .filter(
+      (i) => pathname === i.href || pathname.startsWith(`${i.href}/`)
+    )
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 lg:hidden"
+      className={cn(
+        'fixed inset-x-0 bottom-0 z-50 flex justify-center px-4',
+        !alwaysShow && 'lg:hidden'
+      )}
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 0.75rem)' }}
     >
       <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 shadow-2xl shadow-black/40 backdrop-blur-xl">
-        {navItems.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {items.map((item) => {
+          const active = item.href === activeHref;
           const Icon = item.icon;
           return (
             <Link

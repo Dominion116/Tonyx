@@ -1,5 +1,5 @@
 import { OverviewView } from '@/components/views/overview-view';
 
-export default function OverviewPage() {
+export default function MiniAppHome() {
   return <OverviewView />;
 }
