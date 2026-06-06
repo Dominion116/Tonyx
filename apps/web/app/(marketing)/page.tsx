@@ -9,6 +9,9 @@ import {
   ShieldCheck,
   Wallet,
   HelpCircle,
+  Send,
+  GitFork,
+  MessageCircle,
 } from 'lucide-react';
 import EtherealBeamsHero from '@/components/ui/ethereal-beams-hero';
 import { Button } from '@/components/ui/button';
@@ -130,6 +133,19 @@ const faqs = [
       'Absolutely. Set a spending floor, minimum gain, cooldown, and approval mode once, and Tonyx will never cross those guardrails.',
     icon: ShieldCheck,
   },
+];
+
+const footerLinks = [
+  { title: 'About', href: '/#about' },
+  { title: 'Contact', href: '/#contact' },
+  { title: 'Terms of Service', href: '/#terms' },
+  { title: 'Privacy Policy', href: '/#privacy' },
+];
+
+const footerSocials = [
+  { label: 'Telegram', href: '/', icon: Send },
+  { label: 'Community', href: '/', icon: MessageCircle },
+  { label: 'GitHub', href: '/', icon: GitFork },
 ];
 
 export default function LandingPage() {
@@ -268,15 +284,36 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="py-12">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 sm:flex-row lg:px-8">
-          <span className="text-lg font-bold">Tonyx</span>
-          <div className="flex items-center gap-6 text-sm text-white/60">
-            <Link href="/dashboard" className="hover:text-white">Dashboard</Link>
-            <a href="#features" className="hover:text-white">Features</a>
-            <a href="https://github.com" target="_blank" rel="noreferrer" className="hover:text-white">GitHub</a>
+      <footer className="border-t border-white/10 px-6 py-2">
+        <div className="mx-auto w-full max-w-7xl divide-y divide-white/10">
+          <div className="flex flex-col items-center justify-between gap-4 px-2 pb-5 pt-3 sm:flex-row">
+            <Link className="flex items-center gap-2" href="/">
+              <span className="text-xl font-medium">Tonyx</span>
+            </Link>
+
+            <ul className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-medium">
+              {footerLinks.map(({ title, href }) => (
+                <li key={title}>
+                  <Link href={href} className="text-muted-foreground transition-colors hover:text-white">
+                    {title}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
-          <span className="text-sm text-white/40">Built on TON</span>
+          <div className="flex flex-col-reverse items-center justify-between gap-4 px-2 pb-2 pt-4 sm:flex-row">
+            <p className="text-sm font-medium text-muted-foreground">
+              Copyright &copy; {new Date().getFullYear()} Tonyx. Built on TON.
+            </p>
+
+            <div className="flex items-center gap-4">
+              {footerSocials.map(({ label, href, icon: Icon }) => (
+                <Link key={label} href={href} aria-label={label}>
+                  <Icon className="h-5 w-5 text-muted-foreground transition-colors hover:text-white" />
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       </footer>
     </main>
