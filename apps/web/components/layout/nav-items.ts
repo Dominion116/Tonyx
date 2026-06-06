@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   Radar,
+  MessageSquare,
   SlidersHorizontal,
   History,
   type LucideIcon,
@@ -30,6 +31,12 @@ export const navItems: NavItem[] = [
     shortName: 'Scanner',
     href: '/dashboard/scanner',
     icon: Radar,
+  },
+  {
+    name: 'Chat',
+    shortName: 'Chat',
+    href: '/dashboard/chat',
+    icon: MessageSquare,
   },
   {
     name: 'Policy',

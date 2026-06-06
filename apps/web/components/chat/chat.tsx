@@ -9,14 +9,12 @@ import {
 } from 'react';
 import {
   Check,
+  ChevronLeft,
   MessageSquarePlus,
-  PanelRightClose,
   Pencil,
-  PanelLeftOpen,
   SendHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useChatPanel } from '@/components/chat/chat-panel-context';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import {
@@ -103,12 +101,11 @@ function buildReply(text: string): { content: string; proposal?: Proposal } {
   };
 }
 
-export function ChatPanel() {
-  const { isOpen, close } = useChatPanel();
-
+export function Chat() {
   const [sessions, setSessions] = useState<ChatSession[]>(initialSessions);
   const [activeId, setActiveId] = useState<string>(initialSessions[0].id);
-  const [view, setView] = useState<'thread' | 'sessions'>('thread');
+  /** Mobile-only pane toggle; both panes show together from md up. */
+  const [mobilePane, setMobilePane] = useState<'list' | 'thread'>('thread');
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -130,7 +127,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [activeSession?.messages, view]);
+  }, [activeSession?.messages, mobilePane]);
 
   const orderedSessions = useMemo(
     () => [...sessions].sort((a, b) => b.lastActivityAt - a.lastActivityAt),
@@ -233,7 +230,7 @@ export function ChatPanel() {
     };
     setSessions((prev) => [session, ...prev]);
     setActiveId(session.id);
-    setView('thread');
+    setMobilePane('thread');
   };
 
   const commitRename = (id: string) => {
@@ -260,45 +257,26 @@ export function ChatPanel() {
 
   return (
     <>
-      <aside
-        className={cn(
-          'fixed right-0 top-0 z-[60] flex h-screen w-full flex-col border-l border-white/10 bg-black transition-transform duration-300 ease-in-out sm:w-[400px] lg:w-[360px]',
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        )}
-      >
-        {/* Header */}
-        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-white/10 px-4">
-          <button
-            onClick={() => setView((v) => (v === 'thread' ? 'sessions' : 'thread'))}
-            aria-label="Toggle sessions"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            <PanelLeftOpen className="h-5 w-5" aria-hidden="true" />
-          </button>
-          <span className="text-sm font-semibold text-white">
-            {view === 'sessions' ? 'Chats' : activeSession?.title ?? 'Tonyx AI'}
-          </span>
-          <div className="ml-auto flex items-center gap-1">
+      <div className="flex h-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
+        {/* Sessions list */}
+        <div
+          className={cn(
+            'w-full flex-col border-white/10 md:flex md:w-64 md:border-r',
+            mobilePane === 'list' ? 'flex' : 'hidden md:flex'
+          )}
+        >
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-3">
+            <span className="text-sm font-semibold text-white">Chats</span>
             <button
               onClick={newChat}
               aria-label="New chat"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
             >
               <MessageSquarePlus className="h-5 w-5" aria-hidden="true" />
             </button>
-            <button
-              onClick={close}
-              aria-label="Close chat"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              <PanelRightClose className="h-5 w-5" aria-hidden="true" />
-            </button>
           </div>
-        </div>
 
-        {/* Session list */}
-        {view === 'sessions' ? (
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-2">
             {orderedSessions.length === 0 && (
               <p className="px-2 py-8 text-center text-sm text-muted-foreground">
                 No chats yet.
@@ -329,7 +307,7 @@ export function ChatPanel() {
                       <button
                         onClick={() => {
                           setActiveId(s.id);
-                          setView('thread');
+                          setMobilePane('thread');
                         }}
                         className={cn(
                           'flex-1 truncate text-left text-sm',
@@ -374,18 +352,38 @@ export function ChatPanel() {
               ))}
             </ul>
           </div>
-        ) : (
-          /* Thread */
+        </div>
+
+        {/* Thread + composer */}
+        <div
+          className={cn(
+            'flex-1 flex-col',
+            mobilePane === 'thread' ? 'flex' : 'hidden md:flex'
+          )}
+        >
+          <div className="flex h-14 shrink-0 items-center gap-2 border-b border-white/10 px-3 md:px-4">
+            <button
+              onClick={() => setMobilePane('list')}
+              aria-label="Back to chats"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/5 hover:text-white md:hidden"
+            >
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <span className="truncate text-sm font-semibold text-white">
+              {activeSession?.title ?? 'Tonyx AI'}
+            </span>
+          </div>
+
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {!activeSession || activeSession.messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
                 <p className="text-sm font-medium text-white">Ask Tonyx anything</p>
-                <p className="max-w-[240px] text-xs text-muted-foreground">
+                <p className="max-w-[260px] text-xs text-muted-foreground">
                   Try &ldquo;rebalance my idle USDT&rdquo; or &ldquo;which pool pays best?&rdquo;
                 </p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="mx-auto max-w-3xl space-y-4">
                 {activeSession.messages.map((m) => (
                   <div key={m.id}>
                     <div
@@ -409,7 +407,7 @@ export function ChatPanel() {
                       </div>
                     </div>
                     {m.proposal && (
-                      <div className="mt-3">
+                      <div className="mt-3 max-w-[85%]">
                         <ProposalCard
                           proposal={m.proposal}
                           status={m.proposalStatus}
@@ -425,12 +423,9 @@ export function ChatPanel() {
               </div>
             )}
           </div>
-        )}
 
-        {/* Composer */}
-        {view === 'thread' && (
           <div className="shrink-0 border-t border-white/10 p-3">
-            <div className="flex items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 focus-within:border-accent/40">
+            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-2 focus-within:border-accent/40">
               <textarea
                 rows={1}
                 value={input}
@@ -454,8 +449,8 @@ export function ChatPanel() {
               </button>
             </div>
           </div>
-        )}
-      </aside>
+        </div>
+      </div>
 
       <Modal
         open={pendingDelete !== null}

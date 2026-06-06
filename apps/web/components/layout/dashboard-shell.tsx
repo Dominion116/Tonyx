@@ -5,8 +5,6 @@ import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { DashboardSidebar } from '@/components/layout/dashboard-sidebar';
 import { Dock } from '@/components/layout/dock';
 import { useSidebar } from '@/components/layout/sidebar-context';
-import { ChatPanel } from '@/components/chat/chat-panel';
-import { useChatPanel } from '@/components/chat/chat-panel-context';
 import { cn } from '@/lib/utils';
 
 /**
@@ -16,13 +14,9 @@ import { cn } from '@/lib/utils';
  */
 export function DashboardShell({ children }: { children: ReactNode }) {
   const { isExpanded, isHovered, isMobileOpen, closeMobile } = useSidebar();
-  const { isOpen: isChatOpen } = useChatPanel();
 
-  const marginClass = cn(
-    isExpanded || isHovered ? 'lg:ml-[260px]' : 'lg:ml-[88px]',
-    // Make room for the chat panel on desktop when it is open.
-    isChatOpen && 'lg:mr-[360px]'
-  );
+  const marginClass =
+    isExpanded || isHovered ? 'lg:ml-[260px]' : 'lg:ml-[88px]';
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -46,7 +40,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
       </div>
 
       <Dock />
-      <ChatPanel />
     </div>
   );
 }
