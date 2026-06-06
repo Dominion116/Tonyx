@@ -19,7 +19,7 @@ const CTA = () => {
     <section className="mx-auto max-w-7xl px-6 py-20 sm:py-28 lg:px-8">
       <div
         ref={ref}
-        className="relative flex min-h-96 items-center justify-center overflow-hidden rounded-3xl border border-accent/20 px-6 before:absolute before:-z-10 before:top-24 before:h-4/5 before:w-full before:rounded-full before:bg-gradient-to-r before:from-accent/25 before:from-20% before:via-accent/[0.05] before:via-55% before:to-accent/25 before:to-80% before:blur-3xl"
+        className="relative flex min-h-96 items-center justify-center overflow-hidden rounded-3xl border border-accent/40 bg-gradient-to-br from-[#0098EA] to-[#0067b0] px-6 shadow-2xl shadow-accent/30 before:absolute before:-z-10 before:top-24 before:h-4/5 before:w-full before:rounded-full before:bg-gradient-to-r before:from-white/10 before:from-20% before:via-white/[0.03] before:via-55% before:to-white/10 before:to-80% before:blur-3xl"
       >
         <motion.div
           {...bottomAnimation}
@@ -29,12 +29,12 @@ const CTA = () => {
             <h2 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
               Start earning yield today
             </h2>
-            <p className="text-lg text-muted-foreground">
+            <p className="text-lg text-white/80">
               Connect your wallet, set a policy in two minutes, and let Tonyx
               scan, reason, and rebalance so your funds never sit idle.
             </p>
           </div>
-          <Button asChild size="lg">
+          <Button asChild size="lg" variant="secondary">
             <Link href="/dashboard">
               Launch app
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
