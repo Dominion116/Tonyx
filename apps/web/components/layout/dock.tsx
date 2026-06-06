@@ -2,22 +2,23 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { navItems, type NavItem } from '@/components/layout/nav-items';
+import { navItems, miniAppNavItems } from '@/components/layout/nav-items';
 import { cn } from '@/lib/utils';
 
 /**
  * Floating bottom dock. Shared by the dashboard (mobile only) and the Mini App
- * (always visible). Glassmorphic pill that respects the iOS home bar via
- * env(safe-area-inset-bottom).
+ * (always visible). The item set is chosen by `variant` rather than passed in,
+ * so the function-bearing nav data never crosses a server/client boundary.
+ * Glassmorphic pill that respects the iOS home bar via env(safe-area-inset-bottom).
  */
 export function Dock({
-  items = navItems,
-  alwaysShow = false,
+  variant = 'dashboard',
 }: {
-  items?: NavItem[];
-  alwaysShow?: boolean;
+  variant?: 'dashboard' | 'mini-app';
 }) {
   const pathname = usePathname();
+  const items = variant === 'mini-app' ? miniAppNavItems : navItems;
+  const alwaysShow = variant === 'mini-app';
 
   // Active item is the one whose href is the longest matching prefix, so a
   // parent route like "/mini-app" does not stay active on its sub-routes.
