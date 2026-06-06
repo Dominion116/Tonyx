@@ -1,13 +1,12 @@
 "use client"
 
-import type React from "react"
-
 import { forwardRef, useImperativeHandle, useEffect, useRef, useMemo, type FC, type ReactNode } from "react"
 import * as THREE from "three"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { PerspectiveCamera } from "@react-three/drei"
 import { degToRad } from "three/src/math/MathUtils.js"
 import { ArrowRight, GitFork, Star } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 // ============================================================================
 // BEAMS COMPONENT (3D Background)
@@ -413,42 +412,6 @@ const Beams: FC<BeamsProps> = ({
 }
 
 // ============================================================================
-// BUTTON COMPONENT
-// ============================================================================
-
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "outline" | "ghost"
-  size?: "sm" | "lg"
-  children: React.ReactNode
-}
-
-const Button = ({ variant = "default", size = "sm", className = "", children, ...props }: ButtonProps) => {
-  const baseClasses =
-    "inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/20 disabled:pointer-events-none disabled:opacity-50"
-
-  const variants = {
-    default: "bg-white text-black hover:bg-gray-100",
-    outline: "border border-white/20 bg-white/5 backdrop-blur-xl text-white hover:bg-white/10 hover:border-white/30",
-    ghost: "text-white/90 hover:text-white hover:bg-white/10",
-  }
-
-  const sizes = {
-    sm: "h-9 px-4 py-2 text-sm",
-    lg: "px-8 py-6 text-lg",
-  }
-
-  return (
-    <button
-      className={`group relative overflow-hidden rounded-full ${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
-      {...props}
-    >
-      <span className="relative z-10 flex items-center">{children}</span>
-      <div className="absolute inset-0 -top-2 -bottom-2 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out" />
-    </button>
-  )
-}
-
-// ============================================================================
 // MAIN HERO COMPONENT
 // ============================================================================
 
@@ -490,20 +453,20 @@ export default function EtherealBeamsHero() {
             <div className="hidden md:flex justify-center">
               <div className="flex items-center space-x-1 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 p-1">
                 <a
-                  href="#features"
-                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                  href="#how-it-works"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 >
                   Features
                 </a>
                 <a
-                  href="#how-it-works"
-                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                  href="#faq"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 >
-                  How it works
+                  FAQ
                 </a>
                 <a
                   href="/dashboard"
-                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-all hover:bg-white/10 hover:text-white"
+                  className="rounded-full px-4 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                 >
                   Dashboard
                 </a>
@@ -511,19 +474,19 @@ export default function EtherealBeamsHero() {
             </div>
 
             {/* CTA — right column, aligned to end */}
-            <div className="flex items-center justify-end space-x-4">
-              <a href="https://github.com" target="_blank" rel="noreferrer">
-                <Button variant="ghost" size="sm" className="hidden sm:flex">
-                  <GitFork className="mr-2 h-4 w-4" />
+            <div className="flex items-center justify-end gap-3">
+              <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
+                <a href="https://github.com" target="_blank" rel="noreferrer">
+                  <GitFork className="h-4 w-4" aria-hidden="true" />
                   GitHub
-                </Button>
-              </a>
-              <a href="/dashboard">
-                <Button size="sm">
+                </a>
+              </Button>
+              <Button asChild size="sm">
+                <a href="/dashboard">
                   Launch app
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </a>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </a>
+              </Button>
             </div>
           </div>
         </div>
@@ -534,8 +497,8 @@ export default function EtherealBeamsHero() {
         <div className="mx-auto w-full max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
             {/* Badge */}
-            <div className="mb-8 inline-flex items-center rounded-full bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-2 text-sm text-white/90">
-              <Star className="mr-2 h-4 w-4 text-white" />
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-white/5 backdrop-blur-xl border border-white/10 px-4 py-2 text-sm text-white/90">
+              <Star className="h-4 w-4 text-white" aria-hidden="true" />
               {"Powered by Mira AI · Built on TON"}
             </div>
 
@@ -556,18 +519,18 @@ export default function EtherealBeamsHero() {
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-              <a href="/dashboard">
-                <Button size="lg" className="shadow-2xl shadow-white/25 font-semibold">
+            <div className="mb-12 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <Button asChild size="lg" className="w-full shadow-2xl shadow-white/25 sm:w-auto">
+                <a href="/dashboard">
                   Launch app
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </a>
-              <a href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer">
-                <Button variant="outline" size="lg" className="font-semibold bg-transparent">
+                  <ArrowRight className="h-5 w-5" aria-hidden="true" />
+                </a>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                <a href={`https://t.me/${botUsername}`} target="_blank" rel="noreferrer">
                   Open in Telegram
-                </Button>
-              </a>
+                </a>
+              </Button>
             </div>
 
             {/* Stats */}
