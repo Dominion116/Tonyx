@@ -27,17 +27,21 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+    // Bottom sheet on mobile, centered dialog from sm up.
+    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center sm:p-4">
       <button
         aria-label="Close"
         onClick={onClose}
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 animate-fade-in bg-black/70 backdrop-blur-sm"
       />
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-black p-5 shadow-2xl"
+        className="relative w-full max-w-full animate-slide-up rounded-t-2xl border border-white/10 bg-black p-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] shadow-2xl sm:max-w-sm sm:animate-fade-in sm:rounded-2xl sm:pb-5"
       >
+        {/* Grab handle (mobile only) */}
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" />
+
         {title && (
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold text-white">{title}</h2>
