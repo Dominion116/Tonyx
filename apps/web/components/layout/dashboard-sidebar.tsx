@@ -37,11 +37,12 @@ export function DashboardSidebar() {
           !showLabels && 'lg:justify-center lg:px-0'
         )}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
-          T
-        </span>
-        {showLabels && (
+        {showLabels ? (
           <span className="text-lg font-bold text-white">Tonyx</span>
+        ) : (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-sm font-bold text-accent-foreground">
+            T
+          </span>
         )}
       </Link>
 

@@ -533,21 +533,6 @@ export default function EtherealBeamsHero() {
               </Button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 max-w-2xl mx-auto">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-accent mb-2">STON.fi</div>
-                <div className="text-white/60 text-sm">Pools scanned every 60s</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-accent mb-2">Mira AI</div>
-                <div className="text-white/60 text-sm">Every move explained</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-accent mb-2">x402</div>
-                <div className="text-white/60 text-sm">Pay only when you earn</div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

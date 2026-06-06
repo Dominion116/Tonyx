@@ -1,6 +1,6 @@
 'use client';
 
-import { Menu, PanelLeft, Search } from 'lucide-react';
+import { PanelLeft, Search } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { navItems } from '@/components/layout/nav-items';
 import { useSidebar } from '@/components/layout/sidebar-context';
@@ -31,15 +31,6 @@ export function DashboardHeader() {
         <PanelLeft className="h-5 w-5" aria-hidden="true" />
       </button>
 
-      {/* Drawer toggle (mobile) */}
-      <button
-        onClick={toggleMobile}
-        aria-label="Open menu"
-        className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-white/70 transition-colors hover:bg-white/5 hover:text-white lg:hidden"
-      >
-        <Menu className="h-5 w-5" aria-hidden="true" />
-      </button>
-
       <h1 className="text-base font-semibold text-white">{current}</h1>
 
       {/* Search */}
@@ -57,7 +48,7 @@ export function DashboardHeader() {
         </div>
       </div>
 
-      <Button size="sm" className="ml-auto md:ml-3">
+      <Button size="sm" className="ml-auto">
         Connect wallet
       </Button>
     </header>
