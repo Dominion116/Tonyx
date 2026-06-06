@@ -14,6 +14,8 @@
     --muted-foreground: 0 0% 80%;   /* rgba(255,255,255,0.80) tone */
     --primary: 0 0% 100%;           /* white CTA */
     --primary-foreground: 0 0% 0%;  /* black text on white CTA */
+    /* Full rgba value for inline styles (e.g. BackgroundPattern) */
+    --color-border: rgba(255, 255, 255, 0.1);
   }
 
   * {

@@ -1,6 +1,23 @@
 import Link from 'next/link';
 import { ArrowRight, Radar, Brain, Coins } from 'lucide-react';
 import EtherealBeamsHero from '@/components/ui/ethereal-beams-hero';
+import { Button } from '@/components/ui/button';
+
+function BackgroundPattern() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 -z-10"
+      style={{
+        backgroundImage: `
+          linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+          linear-gradient(to bottom, var(--color-border) 1px, transparent 1px)
+        `,
+        backgroundSize: '24px 24px',
+        maskImage: 'radial-gradient(ellipse 50% 50% at 50% 50%, #000 60%, transparent 100%)',
+      }}
+    />
+  );
+}
 
 const features = [
   {
@@ -36,28 +53,39 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" className="relative border-t border-white/10 py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              An agent, not a dashboard
-            </h2>
-            <p className="mt-4 text-lg text-white/60">
-              Tonyx does the work. You set the rules and approve the moves that matter.
-            </p>
-          </div>
+          <strong className="font-medium text-muted-foreground text-sm uppercase tracking-wide">
+            Why Choose Us
+          </strong>
+          <h2 className="mt-2 max-w-4xl text-balance text-4xl font-bold leading-tight tracking-[-0.04em]">
+            An agent that works while you don&apos;t
+          </h2>
+          <p className="mt-4 max-w-xl text-muted-foreground">
+            Tonyx does the work. You set the rules and approve the moves that matter.
+          </p>
 
-          <div className="mt-16 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
             {features.map((f) => (
               <div
                 key={f.title}
-                className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl transition-colors hover:border-white/20"
+                className="relative w-full overflow-hidden rounded-lg border bg-gradient-to-b from-foreground/[0.03] px-6 py-10 transition-colors hover:border-white/20"
               >
+                <BackgroundPattern />
                 <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5">
                   <f.icon className="h-6 w-6 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold">{f.title}</h3>
-                <p className="mt-3 text-white/60">{f.body}</p>
+                <h3 className="text-lg font-semibold">{f.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{f.body}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-10">
+            <Link href="/dashboard">
+              <Button size="lg">
+                Start earning now
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
