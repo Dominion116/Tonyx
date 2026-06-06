@@ -51,7 +51,7 @@ export default function LandingPage() {
       <EtherealBeamsHero />
 
       {/* Features */}
-      <section id="features" className="relative border-t border-white/10 py-24">
+      <section id="features" className="relative py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <strong className="font-medium text-muted-foreground text-sm uppercase tracking-wide">
             Why Choose Us
@@ -91,7 +91,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="relative border-t border-white/10 py-24">
+      <section id="how-it-works" className="relative py-24">
         <div className="mx-auto max-w-7xl px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">How it works</h2>
@@ -111,7 +111,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA band */}
-      <section className="relative border-t border-white/10 py-24">
+      <section className="relative py-24">
         <div className="mx-auto max-w-4xl px-6 text-center lg:px-8">
           <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
             Start earning yield today
@@ -132,7 +132,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/10 py-12">
+      <footer className="py-12">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-6 sm:flex-row lg:px-8">
           <span className="text-lg font-bold">Tonyx</span>
           <div className="flex items-center gap-6 text-sm text-white/60">
