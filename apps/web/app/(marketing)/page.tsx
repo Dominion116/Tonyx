@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import {
-  ArrowRight,
   Radar,
   Brain,
   Coins,
@@ -14,6 +13,7 @@ import {
   MessageCircle,
 } from 'lucide-react';
 import EtherealBeamsHero from '@/components/ui/ethereal-beams-hero';
+import CTA from '@/components/sections/cta';
 import { Badge } from '@/components/ui/badge';
 import {
   Accordion,
@@ -186,25 +186,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA band */}
-      <section className="relative py-24">
-        <div className="mx-auto max-w-4xl px-6 text-center lg:px-8">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
-            Start earning yield today
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-white/60">
-            Connect your wallet, set a policy in two minutes, and let Tonyx handle the rest.
-          </p>
-          <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
-            <Link
-              href="/dashboard"
-              className="group inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-lg font-semibold text-black transition-colors hover:bg-gray-100"
-            >
-              Launch app
-              <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
-            </Link>
-          </div>
-        </div>
-      </section>
+      <CTA />
 
       {/* Footer */}
       <footer className="border-t border-white/10 px-6 py-2">
