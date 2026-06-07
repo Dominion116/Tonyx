@@ -27,18 +27,22 @@ export function OverviewView({ balance }: Props) {
   const lifetimeYield = balance?.lifetimeYieldUsdt ?? 0;
   const positions = balance?.lpPositions ?? [];
 
-  const metrics = [
+  const balanceMetrics = [
     { label: 'Idle balance', value: fmt(idle), icon: Wallet },
     { label: 'Deployed balance', value: fmt(deployed), icon: Coins },
-    { label: 'Lifetime yield', value: fmt(lifetimeYield), icon: TrendingUp },
   ];
+  const yieldMetric = { label: 'Lifetime yield', value: fmt(lifetimeYield), icon: TrendingUp };
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((m) => (
-          <StatCard key={m.label} {...m} />
+      <div className="flex w-full gap-4">
+        {balanceMetrics.map((m) => (
+          <StatCard key={m.label} className="min-w-0 flex-1" {...m} />
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard {...yieldMetric} />
       </div>
 
       <Card>

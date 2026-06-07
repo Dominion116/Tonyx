@@ -9,23 +9,24 @@ interface StatCardProps {
   /** Optional delta shown as a pill, e.g. "+11.01%". */
   change?: string;
   trend?: 'up' | 'down';
+  className?: string;
 }
 
 /**
  * Metric tile adapted from the admin template: an accent icon badge, a label,
  * a large value, and an optional up/down change pill.
  */
-export function StatCard({ label, value, icon: Icon, change, trend }: StatCardProps) {
+export function StatCard({ label, value, icon: Icon, change, trend, className }: StatCardProps) {
   return (
-    <Card>
+    <Card className={className}>
       <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20">
         <Icon className="h-6 w-6" aria-hidden="true" />
       </div>
 
-      <div className="mt-5 flex items-end justify-between">
-        <div>
+      <div className="mt-5 flex items-end justify-between gap-2">
+        <div className="min-w-0">
           <span className="text-sm text-muted-foreground">{label}</span>
-          <h4 className="mt-2 text-2xl font-bold tracking-tight text-white">
+          <h4 className="mt-2 truncate text-2xl font-bold tracking-tight text-white">
             {value}
           </h4>
         </div>
