@@ -22,8 +22,6 @@ export interface AskMiraProposal {
   routedAmountUsdt: number;
   aprPercent?: number;
   estimatedYieldUsdt: number;
-  x402FeeUsdt: number;
-  netGainUsdt: number;
   confidence: number;
   explanation: string;
 }
@@ -35,8 +33,6 @@ export function buildAskMiraMessage(proposal: AskMiraProposal): string {
     routedAmountUsdt,
     aprPercent,
     estimatedYieldUsdt,
-    x402FeeUsdt,
-    netGainUsdt,
     confidence,
     explanation,
   } = proposal;
@@ -47,8 +43,6 @@ export function buildAskMiraMessage(proposal: AskMiraProposal): string {
     `Amount: $${routedAmountUsdt.toFixed(2)}`,
     ...(aprPercent !== undefined ? [`APR: ${aprPercent.toFixed(2)}%`] : []),
     `Est. yield: $${estimatedYieldUsdt.toFixed(4)}/day`,
-    `x402 fee: $${x402FeeUsdt.toFixed(2)}`,
-    `Net gain: $${netGainUsdt.toFixed(4)}/day`,
     `Tonyx confidence: ${Math.round(confidence * 100)}%`,
     `Tonyx says: "${explanation}"`,
     '',

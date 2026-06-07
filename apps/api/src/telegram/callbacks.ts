@@ -38,7 +38,6 @@ async function handleApprove(ctx: Context, approvalToken: string): Promise<void>
       destinationPool: pending.destinationPool,
       routedAmountUsdt: pending.routedAmountUsdt,
       yieldEarnedUsdt: 0,
-      x402FeeUsdt: pending.x402FeeUsdt,
       approvalToken,
       createdAt: now,
     });
@@ -55,7 +54,7 @@ async function handleApprove(ctx: Context, approvalToken: string): Promise<void>
             ctx
               .reply(
                 `✅ *Rebalanced!*\n\n` +
-                  `Earned $${r.yieldEarnedUsdt.toFixed(4)} · fee $${r.x402FeeUsdt.toFixed(2)}${txLink}`,
+                  `Earned $${r.yieldEarnedUsdt.toFixed(4)}${txLink}`,
                 { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } },
               )
               .catch(() => {});
@@ -89,7 +88,6 @@ async function handleDismiss(ctx: Context, approvalToken: string): Promise<void>
       destinationPool: pending.destinationPool,
       routedAmountUsdt: pending.routedAmountUsdt,
       yieldEarnedUsdt: 0,
-      x402FeeUsdt: 0,
       approvalToken: randomUUID(), // new token — the original was consumed above
       createdAt: new Date(),
       completedAt: new Date(),

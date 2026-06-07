@@ -86,8 +86,7 @@ async function scanWallet(
   if (idleAmount <= 0) return;
 
   const dailyYield = (idleAmount * topPool.aprPercent) / 100 / 365;
-  const netGain = parseFloat((dailyYield - env.x402FeeUsdt).toFixed(4));
-  if (netGain < policy.minNetGainUsdt) return;
+  if (dailyYield < policy.minNetGainUsdt) return;
 
   const rec = evaluateRebalance({
     originPool: 'idle USDT',
@@ -95,8 +94,6 @@ async function scanWallet(
     aprPercent: topPool.aprPercent,
     routedAmountUsdt: idleAmount,
     estimatedYieldUsdt: dailyYield,
-    x402FeeUsdt: env.x402FeeUsdt,
-    netGainUsdt: netGain,
     minNetGainUsdt: policy.minNetGainUsdt,
   });
 
@@ -111,7 +108,6 @@ async function scanWallet(
       topPool.name,
       idleAmount,
       dailyYield,
-      netGain,
       rec.explanation,
     );
   } else {
@@ -121,7 +117,6 @@ async function scanWallet(
       topPool.name,
       idleAmount,
       dailyYield,
-      netGain,
       rec.explanation,
       rec.confidence,
     );
@@ -136,7 +131,6 @@ async function dispatchManualApproval(
   poolName: string,
   amount: number,
   estimatedYield: number,
-  netGain: number,
   explanation: string,
   confidence: number,
 ): Promise<void> {
@@ -148,8 +142,6 @@ async function dispatchManualApproval(
     destinationPool: poolName,
     routedAmountUsdt: amount,
     estimatedYieldUsdt: estimatedYield,
-    x402FeeUsdt: env.x402FeeUsdt,
-    netGainUsdt: netGain,
     expiresAt: Date.now() + 10 * 60 * 1_000,
   });
 
@@ -158,9 +150,7 @@ async function dispatchManualApproval(
     `${explanation}\n\n` +
     `*Route:* idle USDT → ${poolName}\n` +
     `*Amount:* $${amount.toFixed(2)}\n` +
-    `*Est. daily yield:* $${estimatedYield.toFixed(4)}\n` +
-    `*Fee:* $${env.x402FeeUsdt.toFixed(2)}\n` +
-    `*Net gain:* $${netGain.toFixed(4)}`;
+    `*Est. daily yield:* $${estimatedYield.toFixed(4)}`;
 
   try {
     const bot = getBot();
@@ -188,7 +178,6 @@ async function dispatchAutoExecute(
   poolName: string,
   amount: number,
   estimatedYield: number,
-  netGain: number,
   explanation: string,
 ): Promise<void> {
   const approvalToken = randomUUID();
@@ -202,7 +191,6 @@ async function dispatchAutoExecute(
       destinationPool: poolName,
       routedAmountUsdt: amount,
       yieldEarnedUsdt: 0,
-      x402FeeUsdt: env.x402FeeUsdt,
       approvalToken,
       createdAt: now,
     });
@@ -226,7 +214,7 @@ async function dispatchAutoExecute(
               : '';
             const msg =
               r.status === 'completed'
-                ? `✅ *Rebalanced!* Earned $${r.yieldEarnedUsdt.toFixed(4)} · fee $${r.x402FeeUsdt.toFixed(2)}${txLink}`
+                ? `✅ *Rebalanced!* Earned $${r.yieldEarnedUsdt.toFixed(4)}${txLink}`
                 : `❌ *Auto-rebalance failed.* Check /status and try /rebalance manually.`;
             return bot.telegram.sendMessage(telegramUserId, msg, {
               parse_mode: 'Markdown',

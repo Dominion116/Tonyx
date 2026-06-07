@@ -24,9 +24,6 @@ export const env = {
   telegramBotToken: optional('TELEGRAM_BOT_TOKEN', ''),
   telegramWebhookSecret: optional('TELEGRAM_WEBHOOK_SECRET', ''),
 
-  x402WalletAddress: optional('X402_WALLET_ADDRESS', ''),
-  x402FeeUsdt: parseFloat(optional('X402_FEE_USDT', '0.10')),
-
   cronSecret: optional('CRON_SECRET', ''),
 
   corsOrigin: optional('CORS_ORIGIN', 'http://localhost:3000'),

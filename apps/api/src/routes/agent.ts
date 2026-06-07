@@ -13,13 +13,11 @@ import {
 import { PolicyModel, RunModel } from '../db/index.js';
 import { requireAuth } from '../middleware/auth.js';
 import { ApiError } from '../middleware/error.js';
-import { requireX402Payment } from '../middleware/x402.js';
 import { validate } from '../middleware/validate.js';
 import { getPoolsFromCache } from '../cron/poolScanner.js';
 import { evaluateRebalance } from '../services/advisor.js';
 import { savePendingQuote, consumePendingQuote } from '../services/pendingQuotes.js';
 import { trackExecution } from '../services/execution.js';
-import { env } from '../env.js';
 
 const router = Router();
 
@@ -111,17 +109,15 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
     const topPool = eligible[0];
     const secondPool = eligible[1] ?? topPool;
 
-    // ── Estimate yield and fees ──────────────────────────────────────────────
+    // ── Estimate yield ───────────────────────────────────────────────────────
     const dailyYieldPct = topPool.aprPercent / 365;
     const estimatedYieldUsdt = parseFloat(((idleAmountUsdt * dailyYieldPct) / 100).toFixed(4));
-    const x402FeeUsdt = env.x402FeeUsdt;
-    const netGainUsdt = parseFloat((estimatedYieldUsdt - x402FeeUsdt).toFixed(4));
 
-    // ── Policy net-gain eligibility ──────────────────────────────────────────
-    if (netGainUsdt < activePolicy.minNetGainUsdt) {
+    // ── Policy gain eligibility ──────────────────────────────────────────────
+    if (estimatedYieldUsdt < activePolicy.minNetGainUsdt) {
       return next(
         ApiError.badRequest(
-          `Net gain $${netGainUsdt} is below policy minimum $${activePolicy.minNetGainUsdt}`,
+          `Estimated yield $${estimatedYieldUsdt} is below policy minimum $${activePolicy.minNetGainUsdt}`,
           'BELOW_MIN_GAIN',
         ),
       );
@@ -151,8 +147,6 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       aprPercent: topPool.aprPercent,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
-      x402FeeUsdt,
-      netGainUsdt,
       minNetGainUsdt: activePolicy.minNetGainUsdt,
     });
 
@@ -166,8 +160,6 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       destinationPool: topPool.name,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
-      x402FeeUsdt,
-      netGainUsdt,
       expiresAt: Date.now() + 10 * 60 * 1_000,
     });
 
@@ -177,8 +169,6 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       destinationPool: topPool.name,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
-      x402FeeUsdt,
-      netGainUsdt,
       mira: advisorRec,
     };
 
@@ -194,13 +184,8 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
  * @openapi
  * /agent/execute:
  *   post:
- *     summary: Execute an approved quote (requires x402 payment proof)
+ *     summary: Execute an approved quote
  *     tags: [Agent]
- *     parameters:
- *       - in: header
- *         name: X-Payment-Receipt
- *         required: true
- *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
@@ -213,14 +198,11 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
  *     responses:
  *       200:
  *         description: Run created and execution started
- *       402:
- *         description: Payment required
  *       400:
  *         description: Invalid or expired approval token
  */
 router.post(
   '/execute',
-  requireX402Payment,
   requireAuth,
   validate(ExecuteRequestSchema),
   async (req, res, next) => {
@@ -244,7 +226,6 @@ router.post(
         destinationPool: pending.destinationPool,
         routedAmountUsdt: pending.routedAmountUsdt,
         yieldEarnedUsdt: 0,
-        x402FeeUsdt: pending.x402FeeUsdt,
         approvalToken,
         createdAt: now,
       });
@@ -320,7 +301,6 @@ router.get('/runs/:address', requireAuth, async (req, res, next) => {
           destinationPool: r.destinationPool,
           routedAmountUsdt: r.routedAmountUsdt,
           yieldEarnedUsdt: r.yieldEarnedUsdt,
-          x402FeeUsdt: r.x402FeeUsdt,
           txHash: r.txHash,
           createdAt: r.createdAt.toISOString(),
           completedAt: r.completedAt?.toISOString(),

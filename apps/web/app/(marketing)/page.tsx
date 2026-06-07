@@ -53,12 +53,6 @@ const capabilities = [
       'Set a spending floor, minimum gain, cooldown, and approval mode once. The agent never crosses them.',
     icon: ShieldCheck,
   },
-  {
-    title: 'x402 micropayments',
-    description:
-      'A small, transparent fee per executed rebalance. No subscriptions, no spreads. Pay only on results.',
-    icon: Coins,
-  },
 ];
 
 const faqs = [
@@ -83,7 +77,7 @@ const faqs = [
   {
     question: 'What does it cost?',
     answer:
-      'A small, transparent x402 micropayment per executed rebalance. No subscriptions and no hidden spreads. The agent earns only when you earn.',
+      'Tonyx is free to use — no execution fees, no subscriptions, no hidden spreads. You keep everything you earn.',
     icon: Coins,
   },
   {

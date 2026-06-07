@@ -54,5 +54,6 @@ export const navItems: NavItem[] = [
 export const miniAppNavItems: NavItem[] = [
   { name: 'Home', shortName: 'Home', href: '/mini-app', icon: Home },
   { name: 'Scanner', shortName: 'Scanner', href: '/mini-app/scanner', icon: Radar },
+  { name: 'History', shortName: 'History', href: '/mini-app/history', icon: History },
   { name: 'Settings', shortName: 'Settings', href: '/mini-app/settings', icon: Settings },
 ];

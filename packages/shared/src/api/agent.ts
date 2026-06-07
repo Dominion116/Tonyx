@@ -14,8 +14,6 @@ export const QuoteResponseSchema = z.object({
   destinationPool: z.string(),
   routedAmountUsdt: z.number(),
   estimatedYieldUsdt: z.number(),
-  x402FeeUsdt: z.number(),
-  netGainUsdt: z.number(),
   mira: MiraRecommendationSchema,
 });
 export type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
@@ -38,7 +36,6 @@ export const RunSummarySchema = z.object({
   destinationPool: z.string(),
   routedAmountUsdt: z.number(),
   yieldEarnedUsdt: z.number(),
-  x402FeeUsdt: z.number(),
   txHash: z.string().optional(),
   createdAt: z.string().datetime(),
   completedAt: z.string().datetime().optional(),

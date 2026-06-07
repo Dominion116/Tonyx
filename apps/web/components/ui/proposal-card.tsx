@@ -13,8 +13,6 @@ export interface Proposal {
   origin: string;
   destination: string;
   estimatedYield: string;
-  x402Fee: string;
-  netGain: string;
   /** 0-1 confidence from Mira. */
   confidence: number;
   explanation: string;
@@ -88,10 +86,8 @@ export function ProposalCard({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-4">
         <Stat label="Est. yield" value={proposal.estimatedYield} accent />
-        <Stat label="x402 fee" value={proposal.x402Fee} />
-        <Stat label="Net gain" value={proposal.netGain} accent />
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">

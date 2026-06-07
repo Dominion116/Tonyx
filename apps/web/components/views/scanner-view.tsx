@@ -17,9 +17,9 @@ function fmtLiquidity(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
-function estimateNetGain(pool: Pool, idleUsdt: number, x402Fee = 0.1): string {
+function estimateNetGain(pool: Pool, idleUsdt: number): string {
   const dailyYield = (idleUsdt * pool.aprPercent) / 100 / 365;
-  const net = dailyYield - x402Fee - (pool.estimatedBridgeCostUsdt ?? 0);
+  const net = dailyYield - (pool.estimatedBridgeCostUsdt ?? 0);
   const sign = net >= 0 ? '+' : '';
   return `${sign}$${net.toFixed(2)}/day`;
 }

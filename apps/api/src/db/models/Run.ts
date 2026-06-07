@@ -13,7 +13,6 @@ const schema = new Schema<Run>(
     destinationPool: { type: String, required: true, trim: true },
     routedAmountUsdt: { type: Number, required: true, min: 0 },
     yieldEarnedUsdt: { type: Number, required: true, min: 0, default: 0 },
-    x402FeeUsdt: { type: Number, required: true, min: 0 },
     txHash: { type: String },
     approvalToken: { type: String, required: true },
     createdAt: { type: Date, required: true },

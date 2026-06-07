@@ -53,7 +53,6 @@ function RunRow({ run }: { run: RunSummary }) {
       <TableCell className="text-white">{run.destinationPool}</TableCell>
       <TableCell>{fmtUsd(run.routedAmountUsdt)}</TableCell>
       <TableCell className="text-emerald-400">+{fmtUsd(run.yieldEarnedUsdt)}</TableCell>
-      <TableCell>{fmtUsd(run.x402FeeUsdt)}</TableCell>
       <TableCell>
         <Badge variant={statusVariant[run.status]}>{statusLabel[run.status]}</Badge>
       </TableCell>
@@ -105,7 +104,6 @@ export default async function HistoryPage() {
                 <TableHead>To</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Yield</TableHead>
-                <TableHead>Fee</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Tx</TableHead>
               </TableRow>

@@ -22,6 +22,5 @@ export const BalanceResponseSchema = z.object({
   idleUsdt: z.number(),
   deployedUsdt: z.number(),
   lifetimeYieldUsdt: z.number(),
-  lifetimeFeesUsdt: z.number(),
 });
 export type BalanceResponse = z.infer<typeof BalanceResponseSchema>;

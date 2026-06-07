@@ -1,6 +1,6 @@
 # Tonyx
 
-Tonyx is a yield optimization agent for the TON ecosystem. It monitors liquidity pools, evaluates rebalancing opportunities with a transparent, policy-driven advisor engine, gates execution behind x402 micropayments, and delivers approvals through Telegram and a web dashboard. Every proposal can be handed to [@mira](https://t.me/mira) for a second opinion via a one-tap Telegram deep link.
+Tonyx is a yield optimization agent for the TON ecosystem. It monitors liquidity pools, evaluates rebalancing opportunities with a transparent, policy-driven advisor engine, and delivers approvals through Telegram and a web dashboard. Every proposal can be handed to [@mira](https://t.me/mira) for a second opinion via a one-tap Telegram deep link.
 
 ---
 
@@ -23,7 +23,7 @@ Tonyx is a yield optimization agent for the TON ecosystem. It monitors liquidity
 
 Tonyx connects to TON liquidity pools via the Omniston SDK, evaluates yield opportunities against a user-defined policy, and runs every candidate route through a deterministic advisor engine that decides whether to proceed. Users interact through a web dashboard or directly via Telegram -- including a Telegram Mini App WebView.
 
-Every execution is gated behind an x402 payment proof, making fee collection trustless and on-chain. Users can choose manual approval (Telegram inline buttons or dashboard Approve/Dismiss) or fully automatic execution. On any proposal, an "Ask Mira for a second opinion" action opens a pre-filled chat with [@mira](https://t.me/mira) so users can sanity-check the route with Telegram's AI teammate.
+Users can choose manual approval (Telegram inline buttons or dashboard Approve/Dismiss) or fully automatic execution. On any proposal, an "Ask Mira for a second opinion" action opens a pre-filled chat with [@mira](https://t.me/mira) so users can sanity-check the route with Telegram's AI teammate.
 
 ---
 
@@ -36,7 +36,6 @@ Every execution is gated behind an x402 payment proof, making fee collection tru
 | Database | MongoDB Atlas (Mongoose) |
 | Advisor | Deterministic, policy-driven recommendation engine (`apps/api/src/services/advisor.ts`) |
 | DEX routing | Omniston SDK v1beta8 |
-| Payments | x402 micropayment protocol |
 | Messaging | Telegram Bot API, Telegram Mini App SDK |
 | Wallet | TON AppKit (TON Connect), Privy (embedded fallback) |
 | Monorepo | Turborepo, npm workspaces |
@@ -67,7 +66,7 @@ Defines Zod schemas for every MongoDB document (`users`, `policies`, `runs`, `no
 Thin typed wrapper exposing three functions: `discoverPools()`, `getQuote()`, and `executeRoute()`. All Omniston SDK calls go through this package.
 
 **`apps/api`**
-Express 5 server with JWT authentication, wallet signature verification, Telegram HMAC middleware, x402 middleware, a deterministic advisor engine (`services/advisor.ts`), and a background `node-cron` job that scans pools every 60 seconds. Swagger UI is available at `/api/docs`.
+Express 5 server with JWT authentication, wallet signature verification, Telegram HMAC middleware, a deterministic advisor engine (`services/advisor.ts`), and a background `node-cron` job that scans pools every 60 seconds. Swagger UI is available at `/api/docs`.
 
 **`apps/web`**
 Next.js 14 App Router with two layout groups: `(dashboard)` for the web experience and `(mini-app)` for the Telegram Mini App WebView. Fetches data through a typed API client built on top of types from `packages/shared`.
@@ -144,8 +143,6 @@ npm run type-check   # TypeScript type checking across all packages
 | `MONGODB_DB_NAME` | Target database name |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
 | `TELEGRAM_WEBHOOK_SECRET` | HMAC secret for webhook signature verification |
-| `X402_WALLET_ADDRESS` | Tonyx fee collection wallet address |
-| `X402_FEE_USDT` | Per-execution fee in USDT |
 | `CRON_SECRET` | Secret header required by the cron scan endpoint |
 | `SESSION_SECRET` | JWT signing secret |
 
@@ -169,7 +166,7 @@ Express API (apps/api)  <---------+
   |           +-- MongoDB Atlas
   |
   v
-x402 payment verification  -->  Omniston executeRoute
+Approved quote  -->  Omniston executeRoute
   |
   v
 Background coroutine polls TonAPI for txHash, updates run status
@@ -193,10 +190,6 @@ Every quote, Telegram `/rebalance`, and notification-scanner candidate is evalua
 ### Ask Mira for a second opinion
 
 Mira (the [@mira](https://t.me/mira) Telegram bot) has no programmatic API -- only deep links, inline mode, and custom skills. Tonyx bridges to it with `buildAskMiraDeepLink()` (`packages/shared/src/integrations/mira-link.ts`), which renders a proposal as a tagged, plain-language summary and opens `https://t.me/mira?text=<encoded summary>`. The `[TONYX PROPOSAL]` tag at the top is the trigger a custom Mira skill matches on; the rest reads naturally even without the skill configured. Both the Telegram bot's `/rebalance` proposal and the web dashboard's `ProposalCard` use this single shared builder.
-
-### x402 gate
-
-`POST /api/agent/execute` requires a valid x402 payment proof in the request header. The middleware verifies the proof against `X402_WALLET_ADDRESS`, rejects with HTTP 402 and a payment requirement payload if it is missing or invalid, and records used proofs with a TTL index to prevent double-spend.
 
 ---
 
@@ -226,7 +219,7 @@ The project ships in six independent phases. Each phase is deployable on its own
 | Phase | Name | Outcome |
 |---|---|---|
 | 0 | Foundation | Monorepo wired, shared types, CI green, local dev in one command |
-| 1 | Backend Core | Live API with pool scanner, policy engine, and x402 gate |
+| 1 | Backend Core | Live API with pool scanner and policy engine |
 | 2 | Advisor and Backend Core | Quote pipeline, deterministic advisor evaluation, Ask Mira deep-link bridge |
 | 3 | Telegram Bot and Notifications | Bot commands, webhook callbacks, scanner-triggered notifications |
 | 4 | Frontend and UI | Web dashboard, scanner and policy views, Telegram Mini App WebView |
@@ -278,7 +271,7 @@ Swagger UI is available at `http://localhost:4000/api/docs` in development and a
 | POST | `/api/policy` | Create or update policy (wallet signature required) |
 | GET | `/api/policy/:address` | Active policy and version history |
 | POST | `/api/agent/quote` | Get an advisor-evaluated rebalancing proposal |
-| POST | `/api/agent/execute` | Execute approved rebalance (x402 gated) |
+| POST | `/api/agent/execute` | Execute approved rebalance |
 | GET | `/api/agent/runs/:address` | Paginated run history |
 | GET | `/api/agent/runs/:id/status` | Status of a single run |
 | PUT | `/api/notifications/:address` | Update notification preferences |

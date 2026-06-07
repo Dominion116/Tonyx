@@ -52,7 +52,6 @@ export async function fetchBalance(walletAddress: string): Promise<BalanceRespon
       idleUsdt: 0,
       deployedUsdt: 0,
       lifetimeYieldUsdt: 0,
-      lifetimeFeesUsdt: 0,
     };
     balanceCache.set(walletAddress, empty);
     return empty;
@@ -99,7 +98,6 @@ export async function fetchBalance(walletAddress: string): Promise<BalanceRespon
     idleUsdt: parseFloat(idleUsdt.toFixed(2)),
     deployedUsdt: 0,
     lifetimeYieldUsdt: 0,
-    lifetimeFeesUsdt: 0,
   };
 
   balanceCache.set(walletAddress, result);

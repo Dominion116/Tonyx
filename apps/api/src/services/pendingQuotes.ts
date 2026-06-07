@@ -9,8 +9,6 @@ export interface PendingQuote {
   destinationPool: string;
   routedAmountUsdt: number;
   estimatedYieldUsdt: number;
-  x402FeeUsdt: number;
-  netGainUsdt: number;
   expiresAt: number;
 }
 

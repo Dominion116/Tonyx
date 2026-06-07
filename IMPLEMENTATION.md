@@ -1,7 +1,7 @@
 # Tonyx — Implementation Plan
 
 **Version:** 1.1 | **Date:** June 2026  
-**Stack:** Next.js 14 · Express/Node.js 22 · MongoDB Atlas · Omniston SDK · x402 · Telegram Bot API · @mira (deep-link bridge + custom skill)
+**Stack:** Next.js 14 · Express/Node.js 22 · MongoDB Atlas · Omniston SDK · Telegram Bot API · @mira (deep-link bridge + custom skill)
 
 > Patterns from [Agent Ada](https://github.com/oyewale-dominion/Agent-Ada) inform this plan where the two stacks overlap: type-only imports from `packages/shared` into `apps/web`, lean wallet SDKs, and backend-first phase ordering (agent core and API ship before any UI).
 
@@ -14,7 +14,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 | Phase | Name | Outcome |
 |-------|------|---------|
 | 0 | Foundation | Mono-repo wired, shared types, CI green |
-| 1 | Backend Core | Live API with pool scanner and x402 gate |
+| 1 | Backend Core | Live API with pool scanner and policy engine |
 | 2 | Advisor Engine & Ask Mira Bridge | Deterministic advisor evaluation, shared Ask-Mira deep-link builder |
 | 3 | Telegram Bot & Notifications | Bot, webhook, notification dispatch, scanner integration |
 | 4 | Frontend & UI | Web dashboard, scanner & policy views, Telegram Mini App WebView |
@@ -65,7 +65,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ## Phase 1 — Backend Core
 
-**Goal:** A live Express API that authenticates wallets, scans pools, evaluates policy, and gates execution behind x402.
+**Goal:** A live Express API that authenticates wallets, scans pools, and evaluates policy before execution.
 
 ### 1.1 Express App Setup (`apps/api`)
 - [ ] Express 5 + TypeScript strict mode
@@ -94,8 +94,8 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] `GET /api/policy/:address` — returns active policy and full version history ordered by `createdAt` desc
 
 ### 1.6 Quote & Execute Endpoints
-- [ ] `POST /api/agent/quote` — calls `packages/omniston` for route, runs policy eligibility check, computes x402 fee from `X402_FEE_USDT`, returns proposal object with one-time `approvalToken`
-- [ ] `POST /api/agent/execute` — x402 middleware gate (returns HTTP 402 before payment), validates `approvalToken`, submits route via Omniston, creates `runs` document with status `pending`, fires async execution coroutine
+- [ ] `POST /api/agent/quote` — calls `packages/omniston` for route, runs policy eligibility check, returns proposal object with one-time `approvalToken`
+- [ ] `POST /api/agent/execute` — validates `approvalToken`, submits route via Omniston, creates `runs` document with status `pending`, fires async execution coroutine
 - [ ] Execution coroutine: polls TonAPI for `txHash`, transitions run status through `executing -> completed | failed`, updates MongoDB
 
 ### 1.7 Run History Endpoints
@@ -104,10 +104,6 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 1.8 Notification Preferences
 - [ ] `PUT /api/notifications/:address` — validates and upserts notification preferences document
-
-### 1.9 x402 Middleware
-- [ ] Generic x402 Express middleware: checks for valid payment proof in request header, verifies against `X402_WALLET_ADDRESS`, rejects with HTTP 402 + payment requirement payload if missing
-- [ ] Applied to `POST /api/agent/execute`
 
 **Phase 1 exit criteria:** Swagger UI shows all endpoints. Authenticated `curl` calls to `/api/pools`, `/api/agent/quote`, and `/api/agent/execute` return expected shaped responses. A full quote-to-execute-to-poll cycle writes a `completed` run document.
 
@@ -127,7 +123,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Unit tests covering boundary conditions (exactly at the floor, just above/below, large vs. small routes)
 
 ### 2.2 Ask Mira Deep-Link Bridge (`packages/shared/src/integrations/mira-link.ts`)
-- [ ] `AskMiraProposal` type + `buildAskMiraMessage(proposal)`: renders a `[TONYX PROPOSAL]`-tagged, plain-language summary (route, amount, APR, est. yield, x402 fee, net gain, Tonyx confidence, Tonyx explanation, and a closing question to Mira)
+- [ ] `AskMiraProposal` type + `buildAskMiraMessage(proposal)`: renders a `[TONYX PROPOSAL]`-tagged, plain-language summary (route, amount, APR, est. yield, Tonyx confidence, Tonyx explanation, and a closing question to Mira)
 - [ ] `buildAskMiraDeepLink(proposal)`: returns `https://t.me/mira?text=<encoded message>` — chosen over `?start=<payload>` because Telegram caps `start` at ~64 chars and `[A-Za-z0-9_-]` only, far too small for a real proposal; `?text=` has no practical limit and pre-fills the compose box with something useful even without a configured skill
 - [ ] Exported from `@tonyx/shared` so the Telegram bot and the web dashboard format identical messages from one source of truth
 
@@ -188,7 +184,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Place the Ethereal Beams Hero component at `apps/web/components/ui/ethereal-beams-hero.tsx` (provided template), changing only brand name and CTA copy for Tonyx
 - [ ] `(marketing)` route group with a minimal layout — no auth, no sidebar, no dock
 - [ ] **The hero's design tokens are the global theme** — pure black/white glassmorphic: `background #000000`, `foreground #ffffff`, `surface rgba(255,255,255,0.05)`, `border rgba(255,255,255,0.10)`, `muted rgba(255,255,255,0.60)`, pill radius for interactive elements, `backdrop-blur-xl`. These are written into `tailwind.config.ts` and `globals.css` as CSS custom properties and consumed by every page
-- [ ] Landing sections: glassmorphic navbar (Tonyx brand, pill nav, "Launch app" CTA) · hero with animated 3D beams (heading "Your yield, automated", subtitle, "Launch app" → `/dashboard` and "Open in Telegram" deep link) · "Ask Mira for a second opinion · Built on TON" badge · stats row · 3-column features (Autonomous scanning / Transparent advisor engine / x402 micropayments) · "How it works" 4 steps (Connect wallet → Set policy → Agent executes → You earn) · CTA band · footer
+- [ ] Landing sections: glassmorphic navbar (Tonyx brand, pill nav, "Launch app" CTA) · hero with animated 3D beams (heading "Your yield, automated", subtitle, "Launch app" → `/dashboard` and "Open in Telegram" deep link) · "Ask Mira for a second opinion · Built on TON" badge · stats row · 3-column features (Autonomous scanning / Transparent advisor engine / Policy guardrails) · "How it works" 4 steps (Connect wallet → Set policy → Agent executes → You earn) · CTA band · footer
 
 ### 4.1 Next.js 14 App Setup (`apps/web`)
 - [ ] App Router with TypeScript strict mode
@@ -209,7 +205,6 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Fetch balance from `GET /api/balance/:address`; show TON, USDT, and LP token balances in cards
 - [ ] Active pool positions table: pool name, deposited amount, current APR
 - [ ] Lifetime yield earned (sum of `yieldEarnedUsdt` across completed runs)
-- [ ] Total x402 fees paid (sum of `x402FeeUsdt` across completed runs)
 - [ ] 30-second polling with SWR or React Query; optimistic refresh after execute
 
 ### 4.4 Yield Scanner Page (`/dashboard/scanner`)
@@ -221,8 +216,8 @@ Implementation is split into five phases. Each phase is independently shippable 
 ### 4.5 Quote & Execute Flow (Web)
 - [ ] `QuoteModal` component: calls `POST /api/agent/quote`, checks the advisor's `proceed` flag
 - [ ] `proceed: false` — renders `ExplanationCard` with the advisor's plain-language reason; no Approve button
-- [ ] `proceed: true` — renders `ProposalCard` (origin, destination, estimated yield, x402 fee, net gain, advisor explanation, confidence badge, "Ask Mira for a second opinion" button built via `buildAskMiraDeepLink` from `@tonyx/shared`); Approve and Dismiss buttons
-- [ ] Approve: wallet signature via TON AppKit sign-message, then `POST /api/agent/execute` with `approvalToken`; handles HTTP 402 by prompting x402 payment
+- [ ] `proceed: true` — renders `ProposalCard` (origin, destination, estimated yield, advisor explanation, confidence badge, "Ask Mira for a second opinion" button built via `buildAskMiraDeepLink` from `@tonyx/shared`); Approve and Dismiss buttons
+- [ ] Approve: wallet signature via TON AppKit sign-message, then `POST /api/agent/execute` with `approvalToken`
 - [ ] Polls `GET /api/agent/runs/:id/status` and updates modal state (`pending -> executing -> completed`)
 - [ ] On completion: toast notification with yield earned; invalidates balance and runs caches
 
@@ -233,14 +228,14 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Policy version history table: version number, changed fields diff, timestamp
 
 ### 4.7 Run History Page (`/dashboard/history`)
-- [ ] Paginated table of all runs: timestamp, origin pool, destination pool, amount, yield earned, x402 fee, status
+- [ ] Paginated table of all runs: timestamp, origin pool, destination pool, amount, yield earned, status
 - [ ] Link to TON explorer for each completed run via `txHash`
 - [ ] Separate "Skipped" tab for dismissed opportunities
 
 ### 4.8 Telegram Mini App WebView (`apps/web/app/(mini-app)/`)
 - [ ] Separate Next.js route group with Telegram Mini App SDK initialised
 - [ ] Global black/white theme tokens (§4.0) applied; Telegram theme variables (`--tg-theme-bg-color`, `--tg-theme-button-color`, etc.) layered on top where the WebView provides them
-- [ ] Compact layout with the shared **Dock** component (§4.1) pinned to the bottom, 3 items: Home · Scanner · Settings; active item uses the primary token, icon scales up, iOS-style active indicator; `env(safe-area-inset-bottom)` padding respects the iPhone home bar
+- [ ] Compact layout with the shared **Dock** component (§4.1) pinned to the bottom, 4 items: Home · Scanner · History · Settings; active item uses the primary token, icon scales up, iOS-style active indicator; `env(safe-area-inset-bottom)` padding respects the iPhone home bar
 - [ ] Back-button handled via `Telegram.WebApp.BackButton`
 
 ### 4.9 Onboarding Flow (`/mini-app/onboard`)
@@ -261,7 +256,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Pull-to-refresh using `Telegram.WebApp` haptic feedback
 
 ### 4.11 Mini App Proposal Sheet
-- [ ] Bottom sheet with proposal details: origin pool, destination pool, estimated yield, x402 fee, net gain, advisor explanation, "Ask Mira for a second opinion" action (`buildAskMiraDeepLink`)
+- [ ] Bottom sheet with proposal details: origin pool, destination pool, estimated yield, advisor explanation, "Ask Mira for a second opinion" action (`buildAskMiraDeepLink`)
 - [ ] Approve button: wallet signature then `POST /api/agent/execute` then loading state then success/failure
 - [ ] Dismiss button: records skip via backend; sheet closes
 - [ ] Sheet is triggered both from "Rebalance Now" and from notification deep links
@@ -274,6 +269,12 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Full policy editor matching the dashboard policy manager
 - [ ] Notification preferences: alert frequency, minimum gain threshold, quiet hours time picker
 - [ ] Wallet section: shows connected address, option to disconnect
+
+### 4.14 Mini App History Screen (`/mini-app/history`)
+- [ ] Mobile-adapted version of the Run History page (§4.7): scrollable list of runs with timestamp, origin pool, destination pool, amount, yield earned, status, and a link to the TON explorer via `txHash`
+- [ ] Separate "Skipped" tab for dismissed opportunities, mirroring the dashboard
+- [ ] Tap a row: bottom sheet with full run detail
+- [ ] Reachable from the Dock (§4.1) as a fourth item alongside Home · Scanner · Settings, and from the Home screen's "Recent activity" "View all" link
 
 **Phase 4 exit criteria:** The landing page renders at `/` with the animated 3D beams hero, and its design tokens drive the theme across every page. The full quote-to-approve-to-execute cycle completes in the browser dashboard at `/dashboard`, with the Dock appearing on mobile viewports (`< md`) and the sidebar on desktop. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram, navigating via the Dock. Every proposal surface (web `ProposalCard`, Telegram bot, Mini App sheet) renders a working "Ask Mira for a second opinion" action that opens a correctly tagged deep link.
 
@@ -288,13 +289,12 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Helmet.js headers on Express
 - [ ] Wallet signature verification on every policy write (reject if signature does not match `walletAddress`)
 - [ ] `approvalToken` single-use enforcement: mark consumed on execute; reject replays
-- [ ] x402 payment proof double-spend check: store used payment proofs with TTL index in MongoDB
 - [ ] Input sanitisation: all user-supplied strings run through Zod `.trim()` and max-length constraints
 - [ ] Telegram webhook HMAC verified on every incoming request before any processing
 
 ### 5.2 Observability
 - [ ] Structured JSON logging (Pino) with `walletAddress`, `runId`, `sessionId` in every log line
-- [ ] Prometheus metrics endpoint (`/metrics`): pool scan latency, quote duration, execute success rate, x402 fee total, advisor evaluation latency
+- [ ] Prometheus metrics endpoint (`/metrics`): pool scan latency, quote duration, execute success rate, advisor evaluation latency
 - [ ] Error tracking: Sentry DSN configured in both `apps/api` and `apps/web`
 - [ ] MongoDB Atlas performance advisor reviewed; slow query alerts enabled
 
@@ -305,7 +305,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Connection pooling for MongoDB (Mongoose default pool size tuned for Render instance size)
 
 ### 5.4 Testing
-- [ ] Unit tests: Zod schema validators, `evaluateRebalance()` boundary conditions, `buildAskMiraDeepLink()` formatting, policy eligibility checker, x402 middleware
+- [ ] Unit tests: Zod schema validators, `evaluateRebalance()` boundary conditions, `buildAskMiraDeepLink()` formatting, policy eligibility checker
 - [ ] Integration tests: full quote-to-execute-to-poll cycle against a real dev MongoDB with a mocked Omniston client
 - [ ] E2E tests (Playwright): wallet connect, policy set, rebalance, run history visible; Mini App onboarding flow
 - [ ] Load test: 100 concurrent quote requests; p99 under 2 s
@@ -347,8 +347,6 @@ Implementation is split into five phases. Each phase is independently shippable 
 | `MONGODB_DB_NAME` | Database name |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token |
 | `TELEGRAM_WEBHOOK_SECRET` | HMAC secret for webhook verification |
-| `X402_WALLET_ADDRESS` | Tonyx fee collection wallet |
-| `X402_FEE_USDT` | Fee per execution in USDT |
 | `CRON_SECRET` | Protects the cron scan endpoint |
 | `SESSION_SECRET` | JWT signing secret |
 

@@ -38,7 +38,7 @@ export async function handleStatus(ctx: Context): Promise<void> {
         : '📋 No policy set',
       '',
       run
-        ? `✅ *Last run:* earned $${run.yieldEarnedUsdt.toFixed(4)} · fee $${run.x402FeeUsdt.toFixed(2)}`
+        ? `✅ *Last run:* earned $${run.yieldEarnedUsdt.toFixed(4)}`
         : '📭 No completed runs yet',
     ];
 

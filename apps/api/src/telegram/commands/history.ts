@@ -13,7 +13,6 @@ function formatRun(run: {
   status: string;
   destinationPool: string;
   yieldEarnedUsdt: number;
-  x402FeeUsdt: number;
   txHash?: string;
   createdAt: Date;
 }): string {
@@ -25,7 +24,7 @@ function formatRun(run: {
   const tx = run.txHash
     ? ` · [tx](https://tonviewer.com/transaction/${run.txHash})`
     : '';
-  return `${emoji} *${date}* — ${run.destinationPool} · +$${run.yieldEarnedUsdt.toFixed(4)} · fee $${run.x402FeeUsdt.toFixed(2)}${tx}`;
+  return `${emoji} *${date}* — ${run.destinationPool} · +$${run.yieldEarnedUsdt.toFixed(4)}${tx}`;
 }
 
 export async function handleHistory(ctx: Context): Promise<void> {

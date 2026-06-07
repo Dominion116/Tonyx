@@ -16,7 +16,6 @@ export const RunSchema = z.object({
   destinationPool: z.string().trim(),
   routedAmountUsdt: z.number().nonnegative(),
   yieldEarnedUsdt: z.number().nonnegative(),
-  x402FeeUsdt: z.number().nonnegative(),
   txHash: z.string().optional(),
   approvalToken: z.string().min(1),
   createdAt: z.date(),

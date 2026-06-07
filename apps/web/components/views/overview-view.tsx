@@ -1,4 +1,4 @@
-import { Coins, Wallet, TrendingUp, Receipt } from 'lucide-react';
+import { Coins, Wallet, TrendingUp } from 'lucide-react';
 import type { BalanceResponse } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
@@ -25,14 +25,12 @@ export function OverviewView({ balance }: Props) {
   const idle = balance?.idleUsdt ?? 0;
   const deployed = balance?.deployedUsdt ?? 0;
   const lifetimeYield = balance?.lifetimeYieldUsdt ?? 0;
-  const lifetimeFees = balance?.lifetimeFeesUsdt ?? 0;
   const positions = balance?.lpPositions ?? [];
 
   const metrics = [
     { label: 'Idle balance', value: fmt(idle), icon: Wallet },
     { label: 'Deployed balance', value: fmt(deployed), icon: Coins },
     { label: 'Lifetime yield', value: fmt(lifetimeYield), icon: TrendingUp },
-    { label: 'x402 fees paid', value: fmt(lifetimeFees), icon: Receipt },
   ];
 
   return (

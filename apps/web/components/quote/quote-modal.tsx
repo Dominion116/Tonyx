@@ -24,15 +24,14 @@ type Status =
   | 'error'
   | 'proposed'
   | 'signing'
-  | 'payment'
   | 'executing'
   | 'completed'
   | 'failed';
 
-const steps = ['Wallet signature', 'x402 payment', 'Execution'] as const;
+const steps = ['Wallet signature', 'Execution'] as const;
 
 function stepState(status: Status, index: number): 'done' | 'active' | 'pending' {
-  const order: Status[] = ['signing', 'payment', 'executing', 'completed'];
+  const order: Status[] = ['signing', 'executing', 'completed'];
   const current = order.indexOf(status);
   if (status === 'completed') return 'done';
   if (current === -1) return 'pending';
@@ -65,7 +64,6 @@ export function QuoteModal({
   const [runId, setRunId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [explanation, setExplanation] = useState('');
-  const [paymentNotice, setPaymentNotice] = useState('');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -96,7 +94,6 @@ export function QuoteModal({
     setRunId(null);
     setErrorMessage('');
     setExplanation('');
-    setPaymentNotice('');
 
     if (!walletAddress) {
       setErrorMessage('Connect your wallet to request a quote.');
@@ -115,8 +112,6 @@ export function QuoteModal({
           origin: data.originPool,
           destination: data.destinationPool,
           estimatedYield: `${fmtSigned(data.estimatedYieldUsdt)}/day`,
-          x402Fee: `$${data.x402FeeUsdt.toFixed(2)}`,
-          netGain: `${fmtSigned(data.netGainUsdt)}/day`,
           confidence: data.mira.confidence,
           explanation: data.mira.explanation,
         };
@@ -131,8 +126,6 @@ export function QuoteModal({
               routedAmountUsdt: data.routedAmountUsdt,
               aprPercent: parseFloat(pool.apr),
               estimatedYieldUsdt: data.estimatedYieldUsdt,
-              x402FeeUsdt: data.x402FeeUsdt,
-              netGainUsdt: data.netGainUsdt,
               confidence: data.mira.confidence,
               explanation: data.mira.explanation,
             }),
@@ -157,18 +150,16 @@ export function QuoteModal({
   }, [open]);
 
   const approve = () => {
-    // Wallet confirmation, then the x402 payment prompt.
     setStatus('signing');
-    after(900, () => setStatus('payment'));
+    after(900, () => execute());
   };
 
-  const pay = () => {
+  const execute = () => {
     if (!approvalToken) return;
-    setPaymentNotice('');
     setStatus('executing');
 
     api
-      .execute(approvalToken, 'dev-placeholder-receipt')
+      .execute(approvalToken)
       .then((res) => {
         setRunId(res.runId);
         pollTimer.current = setInterval(() => {
@@ -180,7 +171,7 @@ export function QuoteModal({
                 setStatus('completed');
                 toast({
                   title: 'Rebalance complete',
-                  description: `Into ${pool.pair}.${proposal ? ` Net ${proposal.netGain}, fee ${proposal.x402Fee}.` : ''}`,
+                  description: `Into ${pool.pair}.${proposal ? ` Est. ${proposal.estimatedYield}.` : ''}`,
                 });
               } else if (statusRes.status === 'failed') {
                 clearTimers();
@@ -190,19 +181,13 @@ export function QuoteModal({
             .catch(() => {});
         }, 4_000);
       })
-      .catch((err: unknown) => {
-        if (err instanceof ApiError && err.is402) {
-          setPaymentNotice('Payment not yet confirmed. Please complete the x402 payment and try again.');
-          setStatus('payment');
-          return;
-        }
+      .catch(() => {
         setStatus('failed');
       });
   };
 
   const isExecutionPhase =
     status === 'signing' ||
-    status === 'payment' ||
     status === 'executing' ||
     status === 'completed' ||
     status === 'failed';
@@ -309,22 +294,6 @@ export function QuoteModal({
             </p>
           )}
 
-          {status === 'payment' && (
-            <div className="rounded-lg border border-accent/20 bg-accent/[0.06] p-3">
-              <p className="text-sm text-white">
-                An x402 micropayment of{' '}
-                <span className="font-semibold text-accent">{proposal.x402Fee}</span> is
-                required to execute this route.
-              </p>
-              {paymentNotice && (
-                <p className="mt-2 text-xs text-amber-400">{paymentNotice}</p>
-              )}
-              <Button size="sm" className="mt-3 w-full" onClick={pay}>
-                Pay {proposal.x402Fee} and execute
-              </Button>
-            </div>
-          )}
-
           {status === 'executing' && (
             <p className="text-sm text-muted-foreground">
               Submitting the route on TON and polling for confirmation
@@ -336,7 +305,7 @@ export function QuoteModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-emerald-400">
                 <Check className="h-4 w-4" aria-hidden="true" />
-                Rebalanced into {proposal.destination}. Net {proposal.netGain}, fee {proposal.x402Fee}.
+                Rebalanced into {proposal.destination}. Est. {proposal.estimatedYield}.
               </div>
               <Button size="sm" className="w-full" onClick={onClose}>
                 Done
@@ -348,7 +317,7 @@ export function QuoteModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-red-400">
                 <XCircle className="h-4 w-4" aria-hidden="true" />
-                Execution failed. No fee was charged.
+                Execution failed.
               </div>
               <Button
                 size="sm"

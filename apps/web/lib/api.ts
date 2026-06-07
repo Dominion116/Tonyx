@@ -21,10 +21,6 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
-
-  get is402(): boolean {
-    return this.status === 402;
-  }
 }
 
 function getToken(): string | null {
@@ -55,7 +51,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { ...authHeaders(), ...(init?.headers as Record<string, string> ?? {}) },
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string; accepts?: unknown };
+    const body = await res.json().catch(() => ({ error: res.statusText })) as { error?: string };
     throw new ApiError(res.status, (body.error as string) ?? res.statusText);
   }
   // 204 No Content
@@ -87,10 +83,9 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  execute: (approvalToken: string, paymentReceipt: string) =>
+  execute: (approvalToken: string) =>
     apiFetch<ExecuteResponse>('/api/agent/execute', {
       method: 'POST',
-      headers: authHeaders({ 'X-Payment-Receipt': paymentReceipt }),
       body: JSON.stringify({ approvalToken }),
     }),
   getRunStatus: (runId: string) =>

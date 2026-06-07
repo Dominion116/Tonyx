@@ -6,7 +6,6 @@ import { getPoolsFromCache } from '../../cron/poolScanner.js';
 import { fetchBalance } from '../../services/tonapi.js';
 import { evaluateRebalance } from '../../services/advisor.js';
 import { savePendingQuote } from '../../services/pendingQuotes.js';
-import { env } from '../../env.js';
 
 export async function handleRebalance(ctx: Context): Promise<void> {
   const telegramUserId = String(ctx.from?.id ?? '');
@@ -61,7 +60,6 @@ export async function handleRebalance(ctx: Context): Promise<void> {
     const topPool = pools[0];
     const idleAmount = Math.max(balance.idleUsdt - policy.spendingFloorUsdt, 0);
     const dailyYield = (idleAmount * topPool.aprPercent) / 100 / 365;
-    const netGain = parseFloat((dailyYield - env.x402FeeUsdt).toFixed(4));
 
     const rec = evaluateRebalance({
       originPool: 'idle USDT',
@@ -69,8 +67,6 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       aprPercent: topPool.aprPercent,
       routedAmountUsdt: idleAmount,
       estimatedYieldUsdt: dailyYield,
-      x402FeeUsdt: env.x402FeeUsdt,
-      netGainUsdt: netGain,
       minNetGainUsdt: policy.minNetGainUsdt,
     });
 
@@ -91,8 +87,6 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       destinationPool: topPool.name,
       routedAmountUsdt: idleAmount,
       estimatedYieldUsdt: dailyYield,
-      x402FeeUsdt: env.x402FeeUsdt,
-      netGainUsdt: netGain,
       expiresAt: Date.now() + 10 * 60 * 1_000,
     });
 
@@ -101,9 +95,7 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       `${rec.explanation}\n\n` +
       `*Route:* idle USDT → ${topPool.name}\n` +
       `*Amount:* $${idleAmount.toFixed(2)}\n` +
-      `*Est. yield:* $${dailyYield.toFixed(4)}\n` +
-      `*Fee:* $${env.x402FeeUsdt.toFixed(2)}\n` +
-      `*Net gain:* $${netGain.toFixed(4)}`;
+      `*Est. yield:* $${dailyYield.toFixed(4)}`;
 
     const askMiraUrl = buildAskMiraDeepLink({
       originPool: 'idle USDT',
@@ -111,8 +103,6 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       routedAmountUsdt: idleAmount,
       aprPercent: topPool.aprPercent,
       estimatedYieldUsdt: dailyYield,
-      x402FeeUsdt: env.x402FeeUsdt,
-      netGainUsdt: netGain,
       confidence: rec.confidence,
       explanation: rec.explanation,
     });

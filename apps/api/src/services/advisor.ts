@@ -6,8 +6,6 @@ export interface AdvisorInput {
   aprPercent: number;
   routedAmountUsdt: number;
   estimatedYieldUsdt: number;
-  x402FeeUsdt: number;
-  netGainUsdt: number;
   minNetGainUsdt: number;
 }
 
@@ -28,22 +26,23 @@ export function evaluateRebalance(input: AdvisorInput): MiraRecommendation {
     aprPercent,
     routedAmountUsdt,
     estimatedYieldUsdt,
-    x402FeeUsdt,
-    netGainUsdt,
     minNetGainUsdt,
   } = input;
 
-  const proceed = netGainUsdt >= minNetGainUsdt;
+  const proceed = estimatedYieldUsdt >= minNetGainUsdt;
 
-  // Confidence scales with how comfortably the net gain clears the policy
-  // floor, with a small bump for larger routed amounts (more signal, less noise).
-  const margin = minNetGainUsdt > 0 ? (netGainUsdt - minNetGainUsdt) / minNetGainUsdt : netGainUsdt;
+  // Confidence scales with how comfortably the estimated yield clears the
+  // policy floor, with a small bump for larger routed amounts (more signal, less noise).
+  const margin =
+    minNetGainUsdt > 0
+      ? (estimatedYieldUsdt - minNetGainUsdt) / minNetGainUsdt
+      : estimatedYieldUsdt;
   const sizeBonus = Math.min(routedAmountUsdt / 10_000, 0.15);
   const confidence = Math.round(clamp(0.55 + margin * 0.15 + sizeBonus, 0.4, 0.95) * 100) / 100;
 
   const explanation = proceed
-    ? `Routing $${routedAmountUsdt.toFixed(2)} from ${originPool} into ${destinationPool} at ${aprPercent.toFixed(2)}% APR clears your $${minNetGainUsdt.toFixed(2)} minimum net gain: estimated yield $${estimatedYieldUsdt.toFixed(4)}/day minus the $${x402FeeUsdt.toFixed(2)} x402 fee nets $${netGainUsdt.toFixed(4)}/day.`
-    : `Moving into ${destinationPool} at ${aprPercent.toFixed(2)}% APR only nets $${netGainUsdt.toFixed(4)}/day after the $${x402FeeUsdt.toFixed(2)} x402 fee — below your $${minNetGainUsdt.toFixed(2)} minimum. Holding for now; I'll resurface this if the spread widens.`;
+    ? `Routing $${routedAmountUsdt.toFixed(2)} from ${originPool} into ${destinationPool} at ${aprPercent.toFixed(2)}% APR clears your $${minNetGainUsdt.toFixed(2)} minimum gain: estimated yield $${estimatedYieldUsdt.toFixed(4)}/day.`
+    : `Moving into ${destinationPool} at ${aprPercent.toFixed(2)}% APR only yields $${estimatedYieldUsdt.toFixed(4)}/day — below your $${minNetGainUsdt.toFixed(2)} minimum. Holding for now; I'll resurface this if the spread widens.`;
 
   return {
     proceed,
