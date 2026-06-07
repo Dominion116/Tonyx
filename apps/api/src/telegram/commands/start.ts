@@ -22,21 +22,21 @@ export async function handleStart(ctx: Context): Promise<void> {
     `• /rebalance — request a yield proposal right now\n` +
     `• /policy — view your current rules\n` +
     `• /history — see your last five runs\n\n` +
-    `Open the app to connect your wallet and configure your policy.`,
+    `First, install the Mira skill below — then open the app to connect your wallet and configure your policy.`,
     {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
           [
             {
-              text: '🚀 Launch Tonyx',
-              url: MINI_APP_URL,
+              text: '🔮 Install Tonyx Reviewer skill for Mira',
+              url: MIRA_SKILL_INSTALL_URL,
             },
           ],
           [
             {
-              text: '🔮 Install Tonyx Reviewer skill for Mira',
-              url: MIRA_SKILL_INSTALL_URL,
+              text: '🚀 Launch Tonyx',
+              url: MINI_APP_URL,
             },
           ],
         ],
