@@ -2,6 +2,8 @@ import { ExternalLink } from 'lucide-react';
 import type { RunStatus, RunSummary } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination } from '@/components/ui/pagination';
 import {
   Table,
   TableBody,
@@ -76,12 +78,17 @@ function RunRow({ run }: { run: RunSummary }) {
 
 interface Props {
   runs: RunSummary[];
+  /** 1-based page number currently shown. */
+  page?: number;
+  prevHref?: string;
+  nextHref?: string;
 }
 
 /** Run history, shared by the web dashboard and the Mini App history screen. */
-export function HistoryView({ runs }: Props) {
+export function HistoryView({ runs, page = 1, prevHref, nextHref }: Props) {
   const completed = runs.filter((r) => r.status !== 'skipped');
   const skipped = runs.filter((r) => r.status === 'skipped');
+  const showPagination = Boolean(prevHref || nextHref);
 
   return (
     <div className="space-y-6">
@@ -149,6 +156,40 @@ export function HistoryView({ runs }: Props) {
           </Table>
         </Card>
       )}
+
+      {showPagination && <Pagination page={page} prevHref={prevHref} nextHref={nextHref} />}
+    </div>
+  );
+}
+
+/** Loading placeholder mirroring `HistoryView`'s layout. */
+export function HistorySkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+        </CardHeader>
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="ml-auto h-5 w-20 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-9 w-24 rounded-full" />
+        <Skeleton className="h-4 w-14" />
+        <Skeleton className="h-9 w-24 rounded-full" />
+      </div>
     </div>
   );
 }

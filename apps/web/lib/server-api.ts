@@ -57,6 +57,8 @@ export const serverApi = {
   getPolicy: (address: string) =>
     serverFetch<PolicyResponse>(`/api/policy/${address}`),
 
-  getRuns: (address: string) =>
-    serverFetch<RunsResponse>(`/api/agent/runs/${address}`),
+  getRuns: (address: string, cursor?: string) =>
+    serverFetch<RunsResponse>(
+      `/api/agent/runs/${address}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
 };

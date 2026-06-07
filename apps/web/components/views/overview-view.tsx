@@ -3,6 +3,7 @@ import type { BalanceResponse } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -81,6 +82,52 @@ export function OverviewView({ balance }: Props) {
             </TableBody>
           </Table>
         )}
+      </Card>
+    </div>
+  );
+}
+
+/** Loading placeholder mirroring `OverviewView`'s layout. */
+export function OverviewSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex w-full gap-4">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i} className="min-w-0 flex-1">
+            <Skeleton className="h-12 w-12 rounded-xl" />
+            <div className="mt-5 space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-7 w-28" />
+            </div>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card>
+          <Skeleton className="h-12 w-12 rounded-xl" />
+          <div className="mt-5 space-y-2">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-7 w-28" />
+          </div>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-36" />
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </CardHeader>
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="ml-auto h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );

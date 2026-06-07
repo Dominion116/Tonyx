@@ -1,6 +1,7 @@
 import type { Pool } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { RebalanceButton } from '@/components/quote/rebalance-button';
 import {
   Table,
@@ -96,6 +97,32 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0 }: Props) {
             </TableBody>
           </Table>
         )}
+      </Card>
+    </div>
+  );
+}
+
+/** Loading placeholder mirroring `ScannerView`'s layout. */
+export function ScannerSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="h-5 w-28 rounded-full" />
+        </CardHeader>
+        <Skeleton className="mb-4 h-4 w-3/4" />
+        <div className="space-y-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 px-4 py-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="ml-auto h-9 w-24 rounded-full" />
+            </div>
+          ))}
+        </div>
       </Card>
     </div>
   );

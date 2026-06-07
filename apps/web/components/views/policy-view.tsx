@@ -5,6 +5,7 @@ import { useTonAddress } from '@tonconnect/ui-react';
 import type { ApprovalMode } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -38,6 +39,34 @@ function Field({
 
 const inputClass =
   'h-11 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-sm text-white placeholder:text-muted-foreground focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/20';
+
+/** Loading placeholder mirroring the policy form's layout while it fetches. */
+function PolicyFormSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-11 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-28" />
+        <div className="flex flex-wrap gap-2 pt-1">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-8 w-16 rounded-full" />
+          ))}
+        </div>
+      </div>
+
+      <Skeleton className="h-[68px] w-full rounded-lg" />
+      <Skeleton className="h-12 w-full rounded-full" />
+    </div>
+  );
+}
 
 /** Policy manager, shared by the web dashboard and the Mini App settings. */
 export function PolicyView() {
@@ -138,7 +167,7 @@ export function PolicyView() {
         {!walletAddress ? (
           <p className="text-sm text-muted-foreground">Connect your wallet to view and edit your policy.</p>
         ) : loading ? (
-          <p className="text-sm text-muted-foreground">Loading your policy...</p>
+          <PolicyFormSkeleton />
         ) : (
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
