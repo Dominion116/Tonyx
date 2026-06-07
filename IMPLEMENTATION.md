@@ -1,7 +1,7 @@
 # Tonyx — Implementation Plan
 
 **Version:** 1.1 | **Date:** June 2026  
-**Stack:** Next.js 14 · Express/Node.js 22 · MongoDB Atlas · Omniston SDK · Mira AI · x402 · Telegram Bot API
+**Stack:** Next.js 14 · Express/Node.js 22 · MongoDB Atlas · Omniston SDK · x402 · Telegram Bot API · @mira (deep-link bridge + custom skill)
 
 > Patterns from [Agent Ada](https://github.com/oyewale-dominion/Agent-Ada) inform this plan where the two stacks overlap: type-only imports from `packages/shared` into `apps/web`, lean wallet SDKs, and backend-first phase ordering (agent core and API ship before any UI).
 
@@ -15,9 +15,9 @@ Implementation is split into five phases. Each phase is independently shippable 
 |-------|------|---------|
 | 0 | Foundation | Mono-repo wired, shared types, CI green |
 | 1 | Backend Core | Live API with pool scanner and x402 gate |
-| 2 | AI & Chat Backend | Chat API, cross-session memory, Mira evaluation |
+| 2 | Advisor Engine & Ask Mira Bridge | Deterministic advisor evaluation, shared Ask-Mira deep-link builder |
 | 3 | Telegram Bot & Notifications | Bot, webhook, notification dispatch, scanner integration |
-| 4 | Frontend & UI | Web dashboard, chat panel, Telegram Mini App WebView |
+| 4 | Frontend & UI | Web dashboard, scanner & policy views, Telegram Mini App WebView |
 | 5 | Hardening & Launch | Security, performance, monitoring, deployment |
 
 ---
@@ -34,32 +34,27 @@ Implementation is split into five phases. Each phase is independently shippable 
     web/          <- Next.js 14
     api/          <- Express on Node.js 22
   packages/
-    shared/       <- TypeScript types + Zod schemas
+    shared/       <- TypeScript types + Zod schemas + integration helpers (Ask-Mira link builder)
     omniston/     <- Omniston SDK wrapper
-    mira/         <- Mira AI client adapter
   ```
 - [ ] Root `turbo.json` with `dev`, `build`, `lint`, `test` pipelines
 - [ ] Root `package.json` with `workspaces` field pointing to `apps/*` and `packages/*`
 - [ ] `.env.example` files for `apps/web` and `apps/api` covering all variables from the env reference section below
 
 ### 0.2 Shared Package (`packages/shared`)
-- [ ] Zod schemas for every MongoDB document: `users`, `policies`, `runs`, `notifications`, `chat_sessions`, `chat_messages`
+- [ ] Zod schemas for every MongoDB document: `users`, `policies`, `runs`, `notifications`
 - [ ] Inferred TypeScript types exported alongside each schema
 - [ ] Shared API request/response types for every endpoint in the API contract
-- [ ] Zod schema for Mira recommendation object
-- [ ] **Note (from Agent Ada):** `apps/web` must only import types from `packages/shared` using `import type { ... }`. Never import a runtime value (Zod schema, default objects) into a web client component. Validate web forms inline rather than importing schemas.
+- [ ] Zod schema for the advisor recommendation object (`proceed`, `confidence`, `explanation`, `suggestedAction`)
+- [ ] `integrations/mira-link.ts`: `buildAskMiraMessage()` / `buildAskMiraDeepLink()` — the single shared formatter for the `[TONYX PROPOSAL]`-tagged Telegram deep link, consumed at runtime by both `apps/api` (Telegram bot) and `apps/web` (dashboard button)
+- [ ] **Note (from Agent Ada):** `apps/web` must only import types from `packages/shared` using `import type { ... }` (the Ask-Mira link builder is the one runtime exception — see `MIRA_SKILL.md`). Never import Zod schemas or default objects into a web client component. Validate web forms inline rather than importing schemas.
 
 ### 0.3 Omniston Package (`packages/omniston`)
 - [ ] Install Omniston SDK v1beta8
 - [ ] Thin typed wrapper exposing three functions: `discoverPools()`, `getQuote()`, `executeRoute()`
 - [ ] Unit tests with mocked Omniston responses
 
-### 0.4 Mira Package (`packages/mira`)
-- [ ] Mira API client with typed `evaluate(context)` and `chat(messages, context)` methods
-- [ ] Context builder utility that assembles pool data, policy, and balance into Mira's expected input shape
-- [ ] Unit tests with mocked Mira responses
-
-### 0.5 Local Dev Baseline
+### 0.4 Local Dev Baseline
 - [ ] Vercel project linked to `apps/web`
 - [ ] Render service linked to `apps/api`
 - [ ] MongoDB Atlas: dev cluster provisioned, connection string in `.env` files
@@ -81,8 +76,8 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 1.2 MongoDB Atlas Connection
 - [ ] Mongoose connection with retry logic
-- [ ] Models for all six collections: `users`, `policies`, `runs`, `notifications`, `chat_sessions`, `chat_messages`
-- [ ] Index creation on startup: `walletAddress` (all collections), `sessionId` (chat_messages), `deletedAt` (chat_sessions)
+- [ ] Models for all four collections: `users`, `policies`, `runs`, `notifications`
+- [ ] Index creation on startup: `walletAddress` (all collections)
 
 ### 1.3 Authentication Layer
 - [ ] `POST /api/wallet/connect` — accepts wallet address, returns signed JWT session token
@@ -112,48 +107,41 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 1.9 x402 Middleware
 - [ ] Generic x402 Express middleware: checks for valid payment proof in request header, verifies against `X402_WALLET_ADDRESS`, rejects with HTTP 402 + payment requirement payload if missing
-- [ ] Applied to `POST /api/agent/execute` and `POST /api/chat/sessions/:sessionId/messages`
+- [ ] Applied to `POST /api/agent/execute`
 
 **Phase 1 exit criteria:** Swagger UI shows all endpoints. Authenticated `curl` calls to `/api/pools`, `/api/agent/quote`, and `/api/agent/execute` return expected shaped responses. A full quote-to-execute-to-poll cycle writes a `completed` run document.
 
 ---
 
-## Phase 2 — AI & Chat Backend
+## Phase 2 — Advisor Engine & Ask Mira Bridge
 
-**Goal:** All server-side Mira and chat infrastructure is complete and testable via API before any UI depends on it.
+**Goal:** All server-side recommendation logic is complete, deterministic, and testable via API before any UI depends on it — and the bridge to @mira is in place from day one, since it is the hackathon's prize-track integration.
 
-### 2.1 Chat API Endpoints (`apps/api`)
-- [ ] `POST /api/chat/sessions` — creates session, auto-generates title placeholder, returns `{ sessionId, title, createdAt }`
-- [ ] `GET /api/chat/sessions/:address` — lists non-deleted sessions ordered by `lastActivityAt` desc
-- [ ] `GET /api/chat/sessions/:sessionId/messages` — returns paginated messages (cursor-based, `before` query param)
-- [ ] `POST /api/chat/sessions/:sessionId/messages` — main message endpoint (x402 gated):
-  - Validates session belongs to requesting wallet
-  - Assembles cross-session memory: last 40 messages across all wallet sessions ordered by `createdAt` desc, excluding active session
-  - Fetches live yield snapshot (pool APRs, user balance, active policy)
-  - Forwards assembled context to `packages/mira` `chat()` method
-  - Streams SSE response back to client
-  - If Mira returns a proposal object, emits `{ type: 'proposal', data: { quoteId, summary, estimatedYield, x402Fee, netGain } }` event
-  - Saves both messages to `chat_messages` with `contextSnapshot` on the assistant message
-  - Updates `lastActivityAt` on the session document
-- [ ] `DELETE /api/chat/sessions/:sessionId` — soft delete (sets `deletedAt`); messages retained in MongoDB
+> **Why no AI evaluation API:** @mira (the Telegram bot in the "Best project integrating Mira" prize track) has no REST API, webhook system, or SDK — only deep links, inline mode, and custom skills. There is no AI provider key in this stack. Rather than fake an integration against a model endpoint, Tonyx evaluates every route with its own transparent, policy-driven engine, and treats @mira as what it actually is: an optional, conversational second opinion reachable only through Telegram.
 
-### 2.2 Cross-Session Memory Logic
-- [ ] `buildMemoryContext(walletAddress, activeSessionId)` utility in `apps/api/src/lib/`
-- [ ] Queries `chat_messages` for wallet across all sessions excluding active; orders by `createdAt` desc; takes up to 40 messages
-- [ ] Summarises prior-session messages into a condensed history block (one paragraph per session)
-- [ ] Sliding window: if combined token estimate exceeds the configured limit, drops oldest prior-session content first; active thread is never truncated
+### 2.1 Advisor Engine (`apps/api/src/services/advisor.ts`)
+- [ ] `evaluateRebalance(input: AdvisorInput): MiraRecommendation` — single deterministic function consumed by the quote endpoint, the Telegram `/rebalance` command, and the notification scanner (one source of truth, no duplicated fallback logic)
+- [ ] Computes `proceed` from the policy's `minNetGainUsdt` floor
+- [ ] Computes `confidence` (0.4-0.95) scaling with the margin above the policy floor plus a route-size bonus
+- [ ] Produces a templated, plain-language `explanation` and `suggestedAction` for both the proceed and hold cases
+- [ ] Unit tests covering boundary conditions (exactly at the floor, just above/below, large vs. small routes)
 
-### 2.3 Mira Context Builder
-- [ ] `buildEvaluationContext(walletAddress)` in `packages/mira`: fetches pool APRs, Omniston quote for top candidate, estimated costs, active policy, idle balance, last three runs
-- [ ] Returns typed context object mapping directly to Mira's expected input shape
+### 2.2 Ask Mira Deep-Link Bridge (`packages/shared/src/integrations/mira-link.ts`)
+- [ ] `AskMiraProposal` type + `buildAskMiraMessage(proposal)`: renders a `[TONYX PROPOSAL]`-tagged, plain-language summary (route, amount, APR, est. yield, x402 fee, net gain, Tonyx confidence, Tonyx explanation, and a closing question to Mira)
+- [ ] `buildAskMiraDeepLink(proposal)`: returns `https://t.me/mira?text=<encoded message>` — chosen over `?start=<payload>` because Telegram caps `start` at ~64 chars and `[A-Za-z0-9_-]` only, far too small for a real proposal; `?text=` has no practical limit and pre-fills the compose box with something useful even without a configured skill
+- [ ] Exported from `@tonyx/shared` so the Telegram bot and the web dashboard format identical messages from one source of truth
 
-### 2.4 Mira Evaluation on Rebalance Trigger
-- [ ] `POST /api/agent/quote` enhanced to invoke `packages/mira` `evaluate()` before returning the raw Omniston quote
-- [ ] Response includes Mira's `proceed` flag, `confidence` score (0-1), and `explanation` string alongside the standard proposal fields
-- [ ] `proceed: false` responses still return HTTP 200 but include no `approvalToken`; the frontend (Phase 4) will render an explanation card with no Approve button
-- [ ] `proceed: true` responses include the `approvalToken` and Mira's plain-language explanation
+### 2.3 Custom Mira Skill Spec
+- [ ] Document the skill configuration to paste into Mira's custom-skill editor: trigger phrase `[TONYX PROPOSAL]` / slug `/tonyx_review`, behavioral instructions that turn Mira into an opinionated second-opinion reviewer (sanity-check the math, judge the route, react to Tonyx's own confidence, give a clear verdict), and example input/output — see [`MIRA_SKILL.md`](MIRA_SKILL.md)
+- [ ] Configure the skill in Mira's dashboard and verify the `[TONYX PROPOSAL]` trigger fires correctly end to end via the deep link
 
-**Phase 2 exit criteria:** `POST /api/chat/sessions/:sessionId/messages` streams an SSE response via `curl`. Cross-session memory query is verified by seeding two sessions and confirming the second picks up context from the first. `POST /api/agent/quote` returns a Mira-evaluated response with a `proceed` flag.
+### 2.4 Advisor Evaluation on Rebalance Trigger
+- [ ] `POST /api/agent/quote` invokes `evaluateRebalance()` before returning the proposal
+- [ ] Response includes the advisor's `proceed` flag, `confidence` score (0-1), and `explanation` string alongside the standard proposal fields (kept on the existing `mira` field of `QuoteResponse` to avoid a cosmetic rename cascade)
+- [ ] `proceed: false` responses still return HTTP 200 but include no `approvalToken`; the frontend (Phase 4) renders an explanation card with no Approve button
+- [ ] `proceed: true` responses include the `approvalToken`, the advisor's plain-language explanation, and (on the frontend) an "Ask Mira for a second opinion" deep link built from the same response
+
+**Phase 2 exit criteria:** `POST /api/agent/quote` returns an advisor-evaluated response with a `proceed` flag, confidence score, and explanation, sourced entirely from `evaluateRebalance()` — reproducible from the policy alone, with no external AI call. `buildAskMiraDeepLink()` produces a valid `t.me/mira?text=...` URL that opens Telegram with a correctly tagged, readable proposal summary.
 
 ---
 
@@ -181,11 +169,11 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 3.4 Bot Command Handlers
 - [ ] `/status` — replies with idle balance, deployed balance, current APR of active position, and last run summary
-- [ ] `/rebalance` — triggers Mira evaluate for the user's wallet; replies with a proposal message + Approve/Dismiss buttons if `proceed: true`, or Mira's explanation if `proceed: false`
+- [ ] `/rebalance` — runs `evaluateRebalance()` for the user's wallet; replies with a proposal message + Approve/Dismiss buttons and an "🔮 Ask Mira for a second opinion" inline URL button (built via `buildAskMiraDeepLink`) if `proceed: true`, or the advisor's explanation if `proceed: false`
 - [ ] `/policy` — replies with active policy summary and a "Edit in app" button linking to the Mini App settings screen (live in Phase 4)
 - [ ] `/history` — replies with last five runs as formatted text
 
-**Phase 3 exit criteria:** Sending `/start` to the bot returns the welcome message. Sending `/rebalance` triggers a Mira evaluation and returns a proposal message with inline buttons. Tapping Approve from a Telegram notification executes a run and sends a confirmation reply. `/status` returns live balance data.
+**Phase 3 exit criteria:** Sending `/start` to the bot returns the welcome message. Sending `/rebalance` runs the advisor and returns a proposal message with Approve/Dismiss and "Ask Mira for a second opinion" inline buttons — the latter opens Telegram with a correctly formatted `[TONYX PROPOSAL]` message. Tapping Approve from a Telegram notification executes a run and sends a confirmation reply. `/status` returns live balance data.
 
 ---
 
@@ -200,7 +188,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Place the Ethereal Beams Hero component at `apps/web/components/ui/ethereal-beams-hero.tsx` (provided template), changing only brand name and CTA copy for Tonyx
 - [ ] `(marketing)` route group with a minimal layout — no auth, no sidebar, no dock
 - [ ] **The hero's design tokens are the global theme** — pure black/white glassmorphic: `background #000000`, `foreground #ffffff`, `surface rgba(255,255,255,0.05)`, `border rgba(255,255,255,0.10)`, `muted rgba(255,255,255,0.60)`, pill radius for interactive elements, `backdrop-blur-xl`. These are written into `tailwind.config.ts` and `globals.css` as CSS custom properties and consumed by every page
-- [ ] Landing sections: glassmorphic navbar (Tonyx brand, pill nav, "Launch app" CTA) · hero with animated 3D beams (heading "Your yield, automated", subtitle, "Launch app" → `/dashboard` and "Open in Telegram" deep link) · "Powered by Mira AI · Built on TON" badge · stats row · 3-column features (Autonomous scanning / Mira AI reasoning / x402 micropayments) · "How it works" 4 steps (Connect wallet → Set policy → Agent executes → You earn) · CTA band · footer
+- [ ] Landing sections: glassmorphic navbar (Tonyx brand, pill nav, "Launch app" CTA) · hero with animated 3D beams (heading "Your yield, automated", subtitle, "Launch app" → `/dashboard` and "Open in Telegram" deep link) · "Ask Mira for a second opinion · Built on TON" badge · stats row · 3-column features (Autonomous scanning / Transparent advisor engine / x402 micropayments) · "How it works" 4 steps (Connect wallet → Set policy → Agent executes → You earn) · CTA band · footer
 
 ### 4.1 Next.js 14 App Setup (`apps/web`)
 - [ ] App Router with TypeScript strict mode
@@ -231,9 +219,9 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] "Rebalance Now" button on each row triggers the quote flow
 
 ### 4.5 Quote & Execute Flow (Web)
-- [ ] `QuoteModal` component: calls `POST /api/agent/quote`, checks Mira `proceed` flag
-- [ ] `proceed: false` — renders `ExplanationCard` with Mira's plain-language reason; no Approve button
-- [ ] `proceed: true` — renders `ProposalCard` (origin, destination, estimated yield, x402 fee, net gain, Mira explanation, confidence badge); Approve and Dismiss buttons
+- [ ] `QuoteModal` component: calls `POST /api/agent/quote`, checks the advisor's `proceed` flag
+- [ ] `proceed: false` — renders `ExplanationCard` with the advisor's plain-language reason; no Approve button
+- [ ] `proceed: true` — renders `ProposalCard` (origin, destination, estimated yield, x402 fee, net gain, advisor explanation, confidence badge, "Ask Mira for a second opinion" button built via `buildAskMiraDeepLink` from `@tonyx/shared`); Approve and Dismiss buttons
 - [ ] Approve: wallet signature via TON AppKit sign-message, then `POST /api/agent/execute` with `approvalToken`; handles HTTP 402 by prompting x402 payment
 - [ ] Polls `GET /api/agent/runs/:id/status` and updates modal state (`pending -> executing -> completed`)
 - [ ] On completion: toast notification with yield earned; invalidates balance and runs caches
@@ -249,25 +237,15 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Link to TON explorer for each completed run via `txHash`
 - [ ] Separate "Skipped" tab for dismissed opportunities
 
-### 4.8 Dashboard Chat Panel
-- [ ] Persistent right-sidebar `ChatPanel` component visible on all dashboard pages
-- [ ] Session list sidebar: all sessions ordered by last activity; "New Chat" button at top
-- [ ] Active session message thread with streaming content rendering (SSE consumer)
-- [ ] `ProposalCard` component: renders when SSE emits `type: 'proposal'`; shows origin, destination, yield, fee, net gain; Approve and Dismiss buttons
-- [ ] Approve in chat: calls `POST /api/agent/execute` inline, polls status, shows result in thread
-- [ ] Message composer with submit on Enter, Shift+Enter for newline
-- [ ] Session rename: inline edit on session title in the list
-- [ ] Soft delete: removes session from list; confirmation modal warns that message history is retained for cross-session memory
-
-### 4.9 Telegram Mini App WebView (`apps/web/app/(mini-app)/`)
+### 4.8 Telegram Mini App WebView (`apps/web/app/(mini-app)/`)
 - [ ] Separate Next.js route group with Telegram Mini App SDK initialised
 - [ ] Global black/white theme tokens (§4.0) applied; Telegram theme variables (`--tg-theme-bg-color`, `--tg-theme-button-color`, etc.) layered on top where the WebView provides them
-- [ ] Compact layout with the shared **Dock** component (§4.1) pinned to the bottom, 4 items: Home · Scanner · Chat · Settings; active item uses the primary token, icon scales up, iOS-style active indicator; `env(safe-area-inset-bottom)` padding respects the iPhone home bar
+- [ ] Compact layout with the shared **Dock** component (§4.1) pinned to the bottom, 3 items: Home · Scanner · Settings; active item uses the primary token, icon scales up, iOS-style active indicator; `env(safe-area-inset-bottom)` padding respects the iPhone home bar
 - [ ] Back-button handled via `Telegram.WebApp.BackButton`
 
-### 4.10 Onboarding Flow (`/mini-app/onboard`)
+### 4.9 Onboarding Flow (`/mini-app/onboard`)
 - [ ] Step 1: Wallet connection — TON AppKit inside WebView; Privy embedded wallet fallback
-- [ ] Step 2: Mira-guided policy setup as a styled conversational Q&A:
+- [ ] Step 2: Guided policy setup as a styled conversational Q&A:
   - "What's your spending floor?" (slider + text input)
   - "What minimum gain triggers a rebalance?" (preset options + custom)
   - "How often should I check?" (cooldown dropdown)
@@ -276,34 +254,28 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Step 4: Wallet signature via TON AppKit; on success calls `POST /api/policy`
 - [ ] Onboarding state persisted in `localStorage`; completed users skip to Home on next open
 
-### 4.11 Mini App Home Screen (`/mini-app`)
+### 4.10 Mini App Home Screen (`/mini-app`)
 - [ ] Balance cards: idle balance, deployed balance, current APR of active position, lifetime yield
-- [ ] "Rebalance Now" button triggers Mira evaluate and shows the proposal bottom sheet
+- [ ] "Rebalance Now" button runs the advisor and shows the proposal bottom sheet
 - [ ] Recent activity feed: last three runs with one-line summaries
 - [ ] Pull-to-refresh using `Telegram.WebApp` haptic feedback
 
-### 4.12 Mini App Proposal Sheet
-- [ ] Bottom sheet with proposal details: origin pool, destination pool, estimated yield, x402 fee, net gain, Mira explanation
+### 4.11 Mini App Proposal Sheet
+- [ ] Bottom sheet with proposal details: origin pool, destination pool, estimated yield, x402 fee, net gain, advisor explanation, "Ask Mira for a second opinion" action (`buildAskMiraDeepLink`)
 - [ ] Approve button: wallet signature then `POST /api/agent/execute` then loading state then success/failure
 - [ ] Dismiss button: records skip via backend; sheet closes
 - [ ] Sheet is triggered both from "Rebalance Now" and from notification deep links
 
-### 4.13 Mini App Scanner Screen (`/mini-app/scanner`)
+### 4.12 Mini App Scanner Screen (`/mini-app/scanner`)
 - [ ] Same pool table as web dashboard, adapted for mobile viewport
 - [ ] Tap a row: bottom sheet with pool detail and "Rebalance into this pool" CTA
 
-### 4.14 Mini App Chat Screen (`/mini-app/chat`)
-- [ ] Tab strip showing last three sessions; "New Chat" button
-- [ ] Full message thread with streaming SSE rendering
-- [ ] `ProposalCard` adapted for mobile with same Approve/Dismiss flow as desktop
-- [ ] Compose bar pinned to bottom, respects Telegram keyboard inset via `Telegram.WebApp.expand()`
-
-### 4.15 Mini App Settings Screen (`/mini-app/settings`)
+### 4.13 Mini App Settings Screen (`/mini-app/settings`)
 - [ ] Full policy editor matching the dashboard policy manager
 - [ ] Notification preferences: alert frequency, minimum gain threshold, quiet hours time picker
 - [ ] Wallet section: shows connected address, option to disconnect
 
-**Phase 4 exit criteria:** The landing page renders at `/` with the animated 3D beams hero, and its design tokens drive the theme across every page. The full quote-to-approve-to-execute cycle completes in the browser dashboard at `/dashboard`, with the Dock appearing on mobile viewports (`< md`) and the sidebar on desktop. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram, navigating via the Dock. Chat panel streams a Mira response and renders a proposal card that executes inline.
+**Phase 4 exit criteria:** The landing page renders at `/` with the animated 3D beams hero, and its design tokens drive the theme across every page. The full quote-to-approve-to-execute cycle completes in the browser dashboard at `/dashboard`, with the Dock appearing on mobile viewports (`< md`) and the sidebar on desktop. A user can open the Mini App from `/start`, complete onboarding including wallet signature, see their balance, trigger a rebalance, approve it via the notification inline keyboard, and see the confirmation message — all without leaving Telegram, navigating via the Dock. Every proposal surface (web `ProposalCard`, Telegram bot, Mini App sheet) renders a working "Ask Mira for a second opinion" action that opens a correctly tagged deep link.
 
 ---
 
@@ -322,7 +294,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ### 5.2 Observability
 - [ ] Structured JSON logging (Pino) with `walletAddress`, `runId`, `sessionId` in every log line
-- [ ] Prometheus metrics endpoint (`/metrics`): pool scan latency, quote duration, execute success rate, x402 fee total, Mira latency
+- [ ] Prometheus metrics endpoint (`/metrics`): pool scan latency, quote duration, execute success rate, x402 fee total, advisor evaluation latency
 - [ ] Error tracking: Sentry DSN configured in both `apps/api` and `apps/web`
 - [ ] MongoDB Atlas performance advisor reviewed; slow query alerts enabled
 
@@ -330,12 +302,11 @@ Implementation is split into five phases. Each phase is independently shippable 
 - [ ] Pool data cached in MongoDB with TTL; API returns stale-while-revalidate header
 - [ ] `GET /api/balance/:address` cached per wallet for 30 s; invalidated on run completion
 - [ ] Next.js ISR for marketing/static pages; dynamic dashboard routes remain server-rendered
-- [ ] Mira streaming responses piped directly from Mira API to client; no buffering
 - [ ] Connection pooling for MongoDB (Mongoose default pool size tuned for Render instance size)
 
 ### 5.4 Testing
-- [ ] Unit tests: Zod schema validators, cross-session memory builder, policy eligibility checker, x402 middleware
-- [ ] Integration tests: full quote-to-execute-to-poll cycle against a real dev MongoDB with mocked Omniston and Mira
+- [ ] Unit tests: Zod schema validators, `evaluateRebalance()` boundary conditions, `buildAskMiraDeepLink()` formatting, policy eligibility checker, x402 middleware
+- [ ] Integration tests: full quote-to-execute-to-poll cycle against a real dev MongoDB with a mocked Omniston client
 - [ ] E2E tests (Playwright): wallet connect, policy set, rebalance, run history visible; Mini App onboarding flow
 - [ ] Load test: 100 concurrent quote requests; p99 under 2 s
 
@@ -371,7 +342,6 @@ Implementation is split into five phases. Each phase is independently shippable 
 | Variable | Purpose |
 |---|---|
 | `OMNISTON_API_KEY` | Omniston SDK auth |
-| `MIRA_API_KEY` | Mira AI API auth |
 | `TONAPI_KEY` | TonAPI for balance and tx data |
 | `MONGODB_URI` | MongoDB Atlas connection string |
 | `MONGODB_DB_NAME` | Database name |
@@ -392,4 +362,4 @@ Phase 0 --> Phase 1 --> Phase 2 --+
                   +-> Phase 3 --+--> Phase 4 --> Phase 5
 ```
 
-Phase 2 (AI & Chat Backend) and Phase 3 (Telegram Bot) both depend on Phase 1 and can be developed in parallel. Phase 4 (all frontend) depends on both Phase 2 and Phase 3 being complete. Phase 5 hardening runs in parallel with late Phase 4 work.
+Phase 2 (Advisor Engine & Ask Mira Bridge) and Phase 3 (Telegram Bot) both depend on Phase 1 and can be developed in parallel. Phase 4 (all frontend) depends on both Phase 2 and Phase 3 being complete. Phase 5 hardening runs in parallel with late Phase 4 work.
