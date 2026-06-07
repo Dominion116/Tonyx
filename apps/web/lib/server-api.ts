@@ -4,7 +4,6 @@ import type {
   PoolsResponse,
   PolicyResponse,
   RunsResponse,
-  SessionListItem,
 } from '@tonyx/shared';
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
@@ -60,7 +59,4 @@ export const serverApi = {
 
   getRuns: (address: string) =>
     serverFetch<RunsResponse>(`/api/agent/runs/${address}`),
-
-  getSessions: (address: string) =>
-    serverFetch<SessionListItem[]>(`/api/chat/sessions/${address}`),
 };

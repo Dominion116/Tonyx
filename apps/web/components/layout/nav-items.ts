@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Radar,
-  MessageSquare,
   SlidersHorizontal,
   History,
   Home,
@@ -35,12 +34,6 @@ export const navItems: NavItem[] = [
     icon: Radar,
   },
   {
-    name: 'Chat',
-    shortName: 'Chat',
-    href: '/dashboard/chat',
-    icon: MessageSquare,
-  },
-  {
     name: 'Policy',
     shortName: 'Policy',
     href: '/dashboard/policy',
@@ -61,6 +54,5 @@ export const navItems: NavItem[] = [
 export const miniAppNavItems: NavItem[] = [
   { name: 'Home', shortName: 'Home', href: '/mini-app', icon: Home },
   { name: 'Scanner', shortName: 'Scanner', href: '/mini-app/scanner', icon: Radar },
-  { name: 'Chat', shortName: 'Chat', href: '/mini-app/chat', icon: MessageSquare },
   { name: 'Settings', shortName: 'Settings', href: '/mini-app/settings', icon: Settings },
 ];

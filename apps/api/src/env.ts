@@ -19,7 +19,6 @@ export const env = {
   sessionSecret: optional('SESSION_SECRET', 'dev-secret-change-in-prod'),
 
   omnistonApiKey: optional('OMNISTON_API_KEY', ''),
-  miraApiKey: optional('MIRA_API_KEY', ''),
   tonapiKey: optional('TONAPI_KEY', ''),
 
   telegramBotToken: optional('TELEGRAM_BOT_TOKEN', ''),

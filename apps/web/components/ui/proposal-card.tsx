@@ -2,6 +2,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Loader2,
+  Sparkles,
   XCircle,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +34,8 @@ interface ProposalCardProps {
   resultText?: string;
   onApprove?: () => void;
   onDismiss?: () => void;
+  /** Telegram deep link that hands this proposal to @mira for a second opinion. */
+  askMiraUrl?: string;
   className?: string;
 }
 
@@ -60,6 +63,7 @@ export function ProposalCard({
   resultText,
   onApprove,
   onDismiss,
+  askMiraUrl,
   className,
 }: ProposalCardProps) {
   const confidencePct = Math.round(proposal.confidence * 100);
@@ -96,18 +100,28 @@ export function ProposalCard({
 
       <div className="mt-4">
         {status === 'proposed' && (
-          <div className="flex items-center gap-2">
-            <Button size="sm" className="flex-1" onClick={onApprove}>
-              Approve
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1"
-              onClick={onDismiss}
-            >
-              Dismiss
-            </Button>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Button size="sm" className="flex-1" onClick={onApprove}>
+                Approve
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1"
+                onClick={onDismiss}
+              >
+                Dismiss
+              </Button>
+            </div>
+            {askMiraUrl && (
+              <Button asChild size="sm" variant="outline" className="w-full gap-1.5">
+                <a href={askMiraUrl} target="_blank" rel="noopener noreferrer">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  Ask Mira for a second opinion
+                </a>
+              </Button>
+            )}
           </div>
         )}
 

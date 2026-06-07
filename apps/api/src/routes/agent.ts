@@ -1,7 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { getQuote as omnistonGetQuote } from '@tonyx/omniston';
-import { buildContext } from '@tonyx/mira';
 import {
   QuoteRequestSchema,
   ExecuteRequestSchema,
@@ -17,8 +16,7 @@ import { ApiError } from '../middleware/error.js';
 import { requireX402Payment } from '../middleware/x402.js';
 import { validate } from '../middleware/validate.js';
 import { getPoolsFromCache } from '../cron/poolScanner.js';
-import { fetchBalance } from '../services/tonapi.js';
-import { miraClient } from '../services/mira.js';
+import { evaluateRebalance } from '../services/advisor.js';
 import { savePendingQuote, consumePendingQuote } from '../services/pendingQuotes.js';
 import { trackExecution } from '../services/execution.js';
 import { env } from '../env.js';
@@ -31,7 +29,7 @@ const router = Router();
  * @openapi
  * /agent/quote:
  *   post:
- *     summary: Request a rebalance quote evaluated by Mira
+ *     summary: Request a rebalance quote evaluated by Tonyx's advisor engine
  *     tags: [Agent]
  *     requestBody:
  *       required: true
@@ -45,7 +43,7 @@ const router = Router();
  *               idleAmountUsdt: { type: number, minimum: 0 }
  *     responses:
  *       200:
- *         description: Quote with Mira recommendation and one-time approval token
+ *         description: Quote with advisor recommendation and one-time approval token
  *       402:
  *         description: Payment required
  *       403:
@@ -146,46 +144,17 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       // Omniston not reachable in dev — continue with estimate only
     }
 
-    // ── Mira evaluation ──────────────────────────────────────────────────────
-    const [balance] = await Promise.allSettled([fetchBalance(walletAddress)]);
-    const balanceData = balance.status === 'fulfilled'
-      ? { idleUsdt: balance.value.idleUsdt, deployedUsdt: balance.value.deployedUsdt }
-      : { idleUsdt: idleAmountUsdt, deployedUsdt: 0 };
-
-    const miraContext = buildContext({
-      pools: eligible.slice(0, 20),
-      topQuote: {
-        originPool: secondPool.name,
-        destinationPool: topPool.name,
-        routedAmountUsdt: idleAmountUsdt,
-        estimatedYieldUsdt,
-        bridgeCostUsdt: topPool.isCrosschain ? 0.5 : 0,
-        x402FeeUsdt,
-        netGainUsdt,
-      },
-      policy: {
-        minNetGainUsdt: activePolicy.minNetGainUsdt,
-        cooldownSeconds: activePolicy.cooldownSeconds,
-        spendingFloorUsdt: activePolicy.spendingFloorUsdt,
-        eligibleAssets: activePolicy.eligibleAssets,
-        approvalMode: activePolicy.approvalMode as 'auto' | 'manual',
-      },
-      balance: balanceData,
-      recentRuns: [],
+    // ── Advisor evaluation ───────────────────────────────────────────────────
+    const advisorRec = evaluateRebalance({
+      originPool: secondPool.name,
+      destinationPool: topPool.name,
+      aprPercent: topPool.aprPercent,
+      routedAmountUsdt: idleAmountUsdt,
+      estimatedYieldUsdt,
+      x402FeeUsdt,
+      netGainUsdt,
+      minNetGainUsdt: activePolicy.minNetGainUsdt,
     });
-
-    let miraRec = {
-      proceed: netGainUsdt > 0,
-      confidence: 0.75,
-      explanation: `Routing $${idleAmountUsdt} USDT into ${topPool.name} at ${topPool.aprPercent.toFixed(2)}% APR. Estimated daily yield: $${estimatedYieldUsdt}. Fee: $${x402FeeUsdt}. Net gain: $${netGainUsdt}.`,
-      suggestedAction: `Rebalance $${idleAmountUsdt} USDT into ${topPool.name}`,
-    };
-
-    try {
-      miraRec = await miraClient.evaluate(miraContext);
-    } catch {
-      // Mira not reachable in dev — use computed fallback
-    }
 
     // ── Generate approval token ──────────────────────────────────────────────
     const approvalToken = randomUUID();
@@ -210,7 +179,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       estimatedYieldUsdt,
       x402FeeUsdt,
       netGainUsdt,
-      mira: miraRec,
+      mira: advisorRec,
     };
 
     res.json(body);

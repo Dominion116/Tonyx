@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTonAddress } from '@tonconnect/ui-react';
 import { ArrowRight, Check, Loader2, XCircle } from 'lucide-react';
+import { buildAskMiraDeepLink } from '@tonyx/shared';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ExplanationCard } from '@/components/ui/explanation-card';
@@ -59,6 +60,7 @@ export function QuoteModal({
   const walletAddress = useTonAddress();
   const [status, setStatus] = useState<Status>('quoting');
   const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [askMiraUrl, setAskMiraUrl] = useState<string | null>(null);
   const [approvalToken, setApprovalToken] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
@@ -89,6 +91,7 @@ export function QuoteModal({
 
     setStatus('quoting');
     setProposal(null);
+    setAskMiraUrl(null);
     setApprovalToken(null);
     setRunId(null);
     setErrorMessage('');
@@ -121,6 +124,19 @@ export function QuoteModal({
         if (data.mira.proceed && data.approvalToken) {
           setProposal(mapped);
           setApprovalToken(data.approvalToken);
+          setAskMiraUrl(
+            buildAskMiraDeepLink({
+              originPool: data.originPool,
+              destinationPool: data.destinationPool,
+              routedAmountUsdt: data.routedAmountUsdt,
+              aprPercent: parseFloat(pool.apr),
+              estimatedYieldUsdt: data.estimatedYieldUsdt,
+              x402FeeUsdt: data.x402FeeUsdt,
+              netGainUsdt: data.netGainUsdt,
+              confidence: data.mira.confidence,
+              explanation: data.mira.explanation,
+            }),
+          );
           setStatus('proposed');
         } else {
           setExplanation(data.mira.explanation);
@@ -237,6 +253,7 @@ export function QuoteModal({
           status="proposed"
           onApprove={approve}
           onDismiss={onClose}
+          askMiraUrl={askMiraUrl ?? undefined}
         />
       )}
 

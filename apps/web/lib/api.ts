@@ -9,10 +9,6 @@ import type {
   PolicyRequest,
   PolicyVersion,
   PolicyResponse,
-  SessionResponse,
-  SessionListItem,
-  MessagesResponse,
-  SseEvent,
 } from '@tonyx/shared';
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:4000';
@@ -104,21 +100,6 @@ export const api = {
       `/api/agent/runs/${address}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
     ),
 
-  // Chat sessions
-  createSession: (title?: string) =>
-    apiFetch<SessionResponse>('/api/chat/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    }),
-  getSessions: (address: string) =>
-    apiFetch<SessionListItem[]>(`/api/chat/sessions/${address}`),
-  getMessages: (sessionId: string, before?: string) =>
-    apiFetch<MessagesResponse>(
-      `/api/chat/sessions/${sessionId}/messages${before ? `?before=${encodeURIComponent(before)}` : ''}`,
-    ),
-  deleteSession: (sessionId: string) =>
-    apiFetch<void>(`/api/chat/sessions/${sessionId}`, { method: 'DELETE' }),
-
   // Notifications
   updateNotifications: (
     address: string,
@@ -129,68 +110,3 @@ export const api = {
       body: JSON.stringify(body),
     }),
 };
-
-/**
- * Streams a chat message via SSE. Returns a cleanup function to abort.
- * `paymentReceipt` is a placeholder until the x402 client SDK is wired.
- */
-export function streamMessage(
-  sessionId: string,
-  content: string,
-  onEvent: (event: SseEvent) => void,
-  paymentReceipt = 'dev-placeholder',
-): () => void {
-  const controller = new AbortController();
-
-  (async () => {
-    try {
-      const token = getToken();
-      const res = await fetch(`${BASE}/api/chat/sessions/${sessionId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          'X-Payment-Receipt': paymentReceipt,
-        },
-        body: JSON.stringify({ content }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) {
-        onEvent({ type: 'error', message: 'Failed to send message' });
-        return;
-      }
-
-      const reader = res.body?.getReader();
-      if (!reader) return;
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6)) as SseEvent;
-              onEvent(event);
-            } catch {
-              // ignore malformed lines
-            }
-          }
-        }
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      onEvent({ type: 'error', message: 'Connection lost' });
-    }
-  })();
-
-  return () => controller.abort();
-}

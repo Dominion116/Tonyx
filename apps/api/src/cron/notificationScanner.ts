@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
 import cron from 'node-cron';
-import { buildContext } from '@tonyx/mira';
 import {
   NotificationModel,
   PolicyModel,
@@ -9,7 +8,7 @@ import {
 } from '../db/index.js';
 import { getPoolsFromCache } from './poolScanner.js';
 import { fetchBalance } from '../services/tonapi.js';
-import { miraClient } from '../services/mira.js';
+import { evaluateRebalance } from '../services/advisor.js';
 import { savePendingQuote } from '../services/pendingQuotes.js';
 import { trackExecution } from '../services/execution.js';
 import { getBot } from '../telegram/bot.js';
@@ -90,35 +89,16 @@ async function scanWallet(
   const netGain = parseFloat((dailyYield - env.x402FeeUsdt).toFixed(4));
   if (netGain < policy.minNetGainUsdt) return;
 
-  // Mira evaluation
-  const miraContext = buildContext({
-    pools: pools.slice(0, 20),
-    topQuote: {
-      originPool: 'idle USDT',
-      destinationPool: topPool.name,
-      routedAmountUsdt: idleAmount,
-      estimatedYieldUsdt: dailyYield,
-      bridgeCostUsdt: topPool.isCrosschain ? 0.5 : 0,
-      x402FeeUsdt: env.x402FeeUsdt,
-      netGainUsdt: netGain,
-    },
-    policy: {
-      minNetGainUsdt: policy.minNetGainUsdt,
-      cooldownSeconds: policy.cooldownSeconds,
-      spendingFloorUsdt: policy.spendingFloorUsdt,
-      eligibleAssets: policy.eligibleAssets,
-      approvalMode: policy.approvalMode as 'auto' | 'manual',
-    },
-    balance: { idleUsdt: balance.idleUsdt, deployedUsdt: balance.deployedUsdt },
-    recentRuns: [],
+  const rec = evaluateRebalance({
+    originPool: 'idle USDT',
+    destinationPool: topPool.name,
+    aprPercent: topPool.aprPercent,
+    routedAmountUsdt: idleAmount,
+    estimatedYieldUsdt: dailyYield,
+    x402FeeUsdt: env.x402FeeUsdt,
+    netGainUsdt: netGain,
+    minNetGainUsdt: policy.minNetGainUsdt,
   });
-
-  const rec = await miraClient.evaluate(miraContext).catch(() => ({
-    proceed: true,
-    confidence: 0.7,
-    explanation: `${topPool.name} at ${topPool.aprPercent.toFixed(2)}% APR — net gain $${netGain}.`,
-    suggestedAction: `Rebalance $${idleAmount.toFixed(2)} into ${topPool.name}`,
-  }));
 
   if (!rec.proceed) return;
 

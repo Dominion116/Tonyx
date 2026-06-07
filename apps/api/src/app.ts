@@ -11,7 +11,6 @@ import poolsRouter from './routes/pools.js';
 import policyRouter from './routes/policy.js';
 import agentRouter from './routes/agent.js';
 import notificationsRouter from './routes/notifications.js';
-import chatRouter from './routes/chat.js';
 import telegramRouter from './routes/telegram.js';
 
 export function createApp(): express.Application {
@@ -49,7 +48,6 @@ export function createApp(): express.Application {
   app.use('/api/policy', policyRouter);
   app.use('/api/agent', agentRouter);
   app.use('/api/notifications', notificationsRouter);
-  app.use('/api/chat', chatRouter);
   app.use('/api/telegram/webhook', telegramRouter);
 
   // 404 catch-all for unmatched /api/* paths
