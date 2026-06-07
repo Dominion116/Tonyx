@@ -5,6 +5,8 @@ import { cn } from '@/lib/utils';
 interface PaginationProps {
   /** 1-based page number currently shown. */
   page: number;
+  /** Total number of pages. */
+  totalPages?: number;
   /** Href for the previous page, or `undefined` to disable the control. */
   prevHref?: string;
   /** Href for the next page, or `undefined` to disable the control. */
@@ -18,8 +20,8 @@ const linkClass =
 const disabledClass =
   'inline-flex h-9 cursor-not-allowed items-center gap-1.5 rounded-full border border-white/5 bg-white/[0.02] px-4 text-sm font-medium text-muted-foreground/50';
 
-/** Standard Previous/Next pagination control for cursor-paginated lists. */
-export function Pagination({ page, prevHref, nextHref, className }: PaginationProps) {
+/** Standard Previous/Next pagination control for offset-paginated lists. */
+export function Pagination({ page, totalPages, prevHref, nextHref, className }: PaginationProps) {
   return (
     <nav
       aria-label="Pagination"
@@ -37,7 +39,9 @@ export function Pagination({ page, prevHref, nextHref, className }: PaginationPr
         </span>
       )}
 
-      <span className="text-sm text-muted-foreground">Page {page}</span>
+      <span className="text-sm text-muted-foreground">
+        Page {page}{totalPages ? `/${totalPages}` : ''}
+      </span>
 
       {nextHref ? (
         <Link href={nextHref} className={linkClass} aria-label="Next page">

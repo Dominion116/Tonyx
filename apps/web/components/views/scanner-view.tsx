@@ -115,7 +115,12 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
       </Card>
 
       {filtered.length > PAGE_SIZE && (
-        <Pagination page={currentPage} prevHref={prevHref} nextHref={nextHref} />
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          prevHref={prevHref}
+          nextHref={nextHref}
+        />
       )}
     </div>
   );
