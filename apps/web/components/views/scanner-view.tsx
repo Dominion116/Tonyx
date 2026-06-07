@@ -2,6 +2,7 @@ import type { Pool } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Pagination } from '@/components/ui/pagination';
 import { RebalanceButton } from '@/components/quote/rebalance-button';
 import {
   Table,
@@ -11,6 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+const PAGE_SIZE = 10;
 
 function fmtLiquidity(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -29,14 +32,26 @@ interface Props {
   pools?: Pool[] | null;
   cachedAt?: string | null;
   idleUsdt?: number;
+  /** 1-based page number currently shown. */
+  page?: number;
+  /** Base route path used to build Previous/Next links (differs for dashboard vs Mini App). */
+  basePath: string;
 }
 
 /** Yield scanner table, shared by the web dashboard and the Mini App. */
-export function ScannerView({ pools, cachedAt, idleUsdt = 0 }: Props) {
-  const poolList = (pools ?? [])
+export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath }: Props) {
+  const filtered = (pools ?? [])
     .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent > 0 && p.aprPercent < 500_000)
-    .sort((a, b) => b.aprPercent - a.aprPercent)
-    .slice(0, 20);
+    .sort((a, b) => b.aprPercent - a.aprPercent);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const poolList = filtered.slice(start, start + PAGE_SIZE);
+
+  const hrefForPage = (n: number) => (n <= 1 ? basePath : `${basePath}?page=${n}`);
+  const prevHref = currentPage > 1 ? hrefForPage(currentPage - 1) : undefined;
+  const nextHref = currentPage < totalPages ? hrefForPage(currentPage + 1) : undefined;
 
   const ageLabel = cachedAt
     ? `Updated ${Math.round((Date.now() - new Date(cachedAt).getTime()) / 1000)}s ago`
@@ -53,7 +68,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0 }: Props) {
           Ranked by real net gain on your idle balance after swap fees, gas, and slippage.
         </p>
 
-        {poolList.length === 0 ? (
+        {filtered.length === 0 ? (
           <p className="px-4 pb-4 text-sm text-muted-foreground">
             No pools loaded yet. The scanner refreshes every 60 s.
           </p>
@@ -98,6 +113,10 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0 }: Props) {
           </Table>
         )}
       </Card>
+
+      {filtered.length > PAGE_SIZE && (
+        <Pagination page={currentPage} prevHref={prevHref} nextHref={nextHref} />
+      )}
     </div>
   );
 }

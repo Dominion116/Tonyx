@@ -1,7 +1,13 @@
 import { getServerWalletAddress, serverApi } from '@/lib/server-api';
 import { ScannerView } from '@/components/views/scanner-view';
 
-export default async function ScannerPage() {
+const BASE_PATH = '/dashboard/scanner';
+
+interface Props {
+  searchParams: { page?: string };
+}
+
+export default async function ScannerPage({ searchParams }: Props) {
   const address = await getServerWalletAddress();
   const [pools, balance] = await Promise.all([
     serverApi.getPools(),
@@ -13,6 +19,8 @@ export default async function ScannerPage() {
       pools={pools?.pools}
       cachedAt={pools?.cachedAt}
       idleUsdt={balance?.idleUsdt ?? 0}
+      page={Number(searchParams.page) || 1}
+      basePath={BASE_PATH}
     />
   );
 }
