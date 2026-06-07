@@ -16,6 +16,10 @@ export interface Proposal {
   /** 0-1 confidence from Mira. */
   confidence: number;
   explanation: string;
+  /** Set for cross-chain routes; drives the destination-chain badge + bridge stat. */
+  isCrosschain?: boolean;
+  destinationChain?: string;
+  bridgeCostUsdt?: number;
 }
 
 export type ProposalStatus =
@@ -78,16 +82,24 @@ export function ProposalCard({
         <Badge variant="accent">{confidencePct}% confidence</Badge>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 text-sm font-medium text-white">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-medium text-white">
         <span className="rounded-md bg-white/5 px-2 py-1">{proposal.origin}</span>
         <ArrowRight className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
         <span className="rounded-md bg-accent/15 px-2 py-1 text-accent">
           {proposal.destination}
         </span>
+        {proposal.isCrosschain && (
+          <Badge variant="outline" className="text-[10px]">
+            via {proposal.destinationChain ?? 'bridge'}
+          </Badge>
+        )}
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex gap-6">
         <Stat label="Est. yield" value={proposal.estimatedYield} accent />
+        {proposal.isCrosschain && proposal.bridgeCostUsdt !== undefined && (
+          <Stat label="Bridge cost" value={`~$${proposal.bridgeCostUsdt.toFixed(2)}`} />
+        )}
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">

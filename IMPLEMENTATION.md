@@ -9,7 +9,7 @@
 
 ## Overview
 
-Implementation is split into five phases. Each phase is independently shippable and builds on the previous one. All frontend and UI work is consolidated into Phase 4 so the agent core, API, and integrations are hardened before any interface is built on top of them.
+The base product is split into six phases (0-5). Each phase is independently shippable and builds on the previous one. All frontend and UI work is consolidated into Phase 4 so the agent core, API, and integrations are hardened before any interface is built on top of them.
 
 | Phase | Name | Outcome |
 |-------|------|---------|
@@ -19,6 +19,8 @@ Implementation is split into five phases. Each phase is independently shippable 
 | 3 | Telegram Bot & Notifications | Bot, webhook, notification dispatch, scanner integration |
 | 4 | Frontend & UI | Web dashboard, scanner & policy views, Telegram Mini App WebView |
 | 5 | Hardening & Launch | Security, performance, monitoring, deployment |
+
+A subsequent **Cross-Chain Extension** (Omniston Crosschain track) layers cross-chain yield rebalancing on top of the base product. It is documented in its own section after Phase 5 below, and tracked task-by-task in [`STEPS.md`](STEPS.md).
 
 ---
 
@@ -326,6 +328,66 @@ Implementation is split into five phases. Each phase is independently shippable 
 
 ---
 
+## Cross-Chain Extension — Omniston Crosschain Track
+
+**Goal:** qualify for the STON.fi hackathon Omniston Crosschain track by integrating the Omniston Crosschain SDK (v1beta8) as a real, working feature. Tonyx stays a TON-based agent; the new capability rebalances idle TON stables (USDC/USDT) into the best-yielding pool across every chain Omniston bridges to (Ethereum, Base, BNB Chain, Polygon). This extension is additive — TON-only users are never forced through the EVM leg. Task-level tracking lives in [`STEPS.md`](STEPS.md).
+
+### CC.1 Wallet foundation — Reown (replaces dormant Privy plan)
+- [x] Remove the dormant Privy plan (comment block, `NEXT_PUBLIC_PRIVY_APP_ID`, inert embedded-wallet button)
+- [x] Add `@reown/appkit` + an EVM adapter to `apps/web`; wire `NEXT_PUBLIC_REOWN_PROJECT_ID`
+- [x] Extend `WalletProvider` to wrap children in the AppKit provider alongside `TonConnectUIProvider` (TON Connect stays primary; Reown is additive)
+- [x] EVM connect surfaced in `WalletButton` / header; only required when opting into cross-chain
+
+**Exit criteria:** a user can connect both a TON wallet and an EVM wallet from the Mini App and dashboard; both addresses are retrievable client-side.
+
+### CC.2 SDK upgrade & wrapper rework (`packages/omniston`)
+- [x] Bump `@ston-fi/omniston-sdk` to v1beta8
+- [x] `types.ts`: chain-tagged `AssetRef` / `AddressRef` / `QuoteParams` with explicit `chain` on input and output
+- [x] `quote.ts` reworked around subscription-based `requestForQuote()` RFQ stream (`quoteUpdated` / `ack` / `noQuote`)
+- [x] `execute.ts` branches on settlement type: same-chain `tonBuildSwap()`; cross-chain `tonBuildEscrowTransfer()` (TON side) / `evmBuildOrderPayload()` + `orderRegisterSignedOrder()` (EVM side)
+- [x] `swapTrack()` / `orderTrack()` / `orderDiscloseHtlcSecret()` wrappers for settlement monitoring
+
+**Exit criteria:** `packages/omniston` compiles and tests pass against v1beta8; same-chain TON quote+swap still works end to end.
+
+### CC.3 Cross-chain pool discovery
+- [x] DefiLlama Yields API client (`discoverCrosschainPools()`) hitting `yields.llama.fi/pools`
+- [x] Filter to `chain` ∈ {Ethereum, Base, BNB Chain, Polygon} and stablecoin symbols (USDC/USDT)
+- [x] Map onto the `Pool` schema (`apy`→`aprPercent`, `tvlUsd`→`liquidityUsdt`, `isCrosschain: true`) with a coarse `estimatedBridgeCostUsdt` per chain for ranking
+- [x] Merge native STON.fi + cross-chain pools in `refreshPoolCache()` so the scanner ranks everything together
+- [x] `ScannerView` Crosschain badge renders for these entries
+
+**Exit criteria:** `/api/pools` returns a mixed list of TON-native and cross-chain pools, correctly flagged and ranked; the scanner UI distinguishes them.
+
+### CC.4 Advisor engine — weigh cross-chain economics
+- [x] `evaluateRebalance()` treats `estimatedBridgeCostUsdt` and settlement risk as first-class inputs
+- [x] Cross-chain routes must clear a higher net-gain floor (2.5×); confidence carries a settlement-risk penalty
+- [x] Explanations name the destination chain and bridge cost for cross-chain routes
+- [x] Cross-chain metadata passed to the advisor in all callers (quote endpoint, Telegram `/rebalance`, notification scanner)
+
+**Exit criteria:** a cross-chain candidate clearing the floor produces an honest, bridge-cost-aware proposal; one that doesn't is suppressed.
+
+### CC.5 Cross-chain execution flow
+- [x] `/api/agent/quote` and `/api/agent/execute` accept and route cross-chain proposals (settlement type carried via the pending quote)
+- [x] EVM signing path wired through `evmBuildOrderPayload()` → sign → `orderRegisterSignedOrder()`; TON side via `tonBuildEscrowTransfer()` + TON Connect (signing is client-side, mirroring the same-chain path)
+- [x] Settlement tracking: `trackCrosschainExecution()` drives the `runs` lifecycle (executing → completed | stuck | failed) via `orderTrack`, with a per-run settlement-phase surfaced on `/runs/:id/status`
+- [x] Partial fills / stalled settlements handled as a distinct `stuck` run status with a clear "funds safe in escrow" message
+- [x] Telegram + web: approve / auto-execute / completion messaging names the destination chain and bridge step; `/status` surfaces stuck settlements
+
+**Exit criteria:** a user can approve a cross-chain proposal and watch it move through the full `runs` lifecycle to completion (or a clearly explained stuck/failed state) in the bot and the dashboard/Mini App.
+
+### CC.6 UI polish, docs, and submission
+- [x] Dashboard + Mini App: destination chain, bridge cost, and settlement status shown on cross-chain `ProposalCard`s and run-history rows
+- [x] `README.md` updated (Tech Stack, Architecture, Key Features) for the cross-chain capability and Reown integration
+- [x] `IMPLEMENTATION.md` updated to reflect the new scope (this section)
+- [ ] Demo video + submission write-up — pending manual end-to-end testing
+- [ ] Final regression pass: confirm same-chain TON rebalancing still works exactly as before
+
+**Exit criteria:** live deploy reflects all of the above; submission package (repo, live URL, video) is ready.
+
+> **Note on bridge-cost estimation:** the coarse per-chain estimate in CC.3 is for ranking only. The authoritative number always comes from a live Omniston quote at execution time and must not be treated as final by the advisor.
+
+---
+
 ## Environment Variables Reference
 
 ### Frontend (`apps/web/.env.local`)
@@ -333,7 +395,7 @@ Implementation is split into five phases. Each phase is independently shippable 
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_TON_MANIFEST_URL` | TON Connect manifest for wallet pairing |
-| `NEXT_PUBLIC_PRIVY_APP_ID` | Privy embedded wallet app ID |
+| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Reown Cloud project ID for the EVM wallet (cross-chain leg) |
 | `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL |
 | `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | Bot username for Mini App deep links |
 

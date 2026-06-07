@@ -124,6 +124,9 @@ export function QuoteModal({
           estimatedYield: `${fmtSigned(data.estimatedYieldUsdt)}/day`,
           confidence: data.mira.confidence,
           explanation: data.mira.explanation,
+          isCrosschain: data.isCrosschain,
+          destinationChain: data.destinationChain,
+          bridgeCostUsdt: data.bridgeCostUsdt,
         };
 
         if (data.isCrosschain) {

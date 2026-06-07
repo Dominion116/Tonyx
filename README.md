@@ -23,6 +23,8 @@ Tonyx is a yield optimization agent for the TON ecosystem. It monitors liquidity
 
 Tonyx connects to TON liquidity pools via the Omniston SDK, evaluates yield opportunities against a user-defined policy, and runs every candidate route through a deterministic advisor engine that decides whether to proceed. Users interact through a web dashboard or directly via Telegram -- including a Telegram Mini App WebView.
 
+Beyond TON-native pools, Tonyx uses Omniston's cross-chain settlement to rebalance idle stables (USDC/USDT) into the best-yielding pool across Ethereum, Base, BNB Chain, and Polygon. Cross-chain candidates are discovered from the DefiLlama Yields API, ranked against native pools with a bridge-cost-aware advisor, and settled through Omniston's HTLC order flow. An EVM wallet (via Reown AppKit) is connected additively alongside TON Connect, so TON-only users are never forced through the EVM leg.
+
 Users can choose manual approval (Telegram inline buttons or dashboard Approve/Dismiss) or fully automatic execution. On any proposal, an "Ask Mira for a second opinion" action opens a pre-filled chat with [@mira](https://t.me/mira) so users can sanity-check the route with Telegram's AI teammate.
 
 ---
@@ -35,9 +37,10 @@ Users can choose manual approval (Telegram inline buttons or dashboard Approve/D
 | Backend | Express 5, Node.js 22, TypeScript strict mode |
 | Database | MongoDB Atlas (Mongoose) |
 | Advisor | Deterministic, policy-driven recommendation engine (`apps/api/src/services/advisor.ts`) |
-| DEX routing | Omniston SDK v1beta8 |
+| DEX & cross-chain routing | Omniston SDK v1beta8 (same-chain swaps + cross-chain HTLC orders) |
+| Cross-chain pool discovery | DefiLlama Yields API (`yields.llama.fi/pools`) |
 | Messaging | Telegram Bot API, Telegram Mini App SDK |
-| Wallet | TON AppKit (TON Connect), Privy (embedded fallback) |
+| Wallet | TON Connect (primary), Reown AppKit (additive EVM leg for cross-chain) |
 | Monorepo | Turborepo, npm workspaces |
 | Hosting | Vercel (frontend), Render (backend + worker) |
 
@@ -63,7 +66,7 @@ tonyx/
 Defines Zod schemas for every MongoDB document (`users`, `policies`, `runs`, `notifications`) and all API request/response shapes, plus shared integration helpers such as `buildAskMiraDeepLink` (in `integrations/mira-link.ts`), which both the Telegram bot and the web dashboard use to build the "Ask Mira for a second opinion" deep link from a single source of truth. `apps/web` imports types from this package using `import type { ... }` for runtime/Zod-free bundles, and the `buildAskMiraDeepLink` helper at runtime.
 
 **`packages/omniston`**
-Thin typed wrapper exposing three functions: `discoverPools()`, `getQuote()`, and `executeRoute()`. All Omniston SDK calls go through this package.
+Thin typed wrapper around the Omniston SDK. Exposes pool discovery (`discoverPools()` for STON.fi TON pools, `discoverCrosschainPools()` for DefiLlama cross-chain stable pools), quoting (`getQuote()`), routing (`executeRoute()`, `registerSignedOrder()`), and settlement tracking (`trackSwap()`, `trackOrder()`, `discloseHtlcSecret()`). All Omniston SDK calls go through this package.
 
 **`apps/api`**
 Express 5 server with JWT authentication, wallet signature verification, Telegram HMAC middleware, a deterministic advisor engine (`services/advisor.ts`), and a background `node-cron` job that scans pools every 60 seconds. Swagger UI is available at `/api/docs`.
@@ -129,7 +132,7 @@ npm run type-check   # TypeScript type checking across all packages
 | Variable | Purpose |
 |---|---|
 | `NEXT_PUBLIC_TON_MANIFEST_URL` | TON Connect manifest URL for wallet pairing |
-| `NEXT_PUBLIC_PRIVY_APP_ID` | Privy embedded wallet app ID |
+| `NEXT_PUBLIC_REOWN_PROJECT_ID` | Reown Cloud project ID for the EVM wallet (cross-chain leg) |
 | `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL |
 | `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | Bot username used for Mini App deep links |
 
@@ -157,19 +160,21 @@ User (web or Telegram)
   |
   v
 Next.js App (apps/web)  --  Telegram Bot / Mini App
-  |                               |
+  |   (TON Connect + Reown EVM)    |
   v                               v
 Express API (apps/api)  <---------+
   |           |
-  |           +-- packages/omniston    -->  Omniston SDK  -->  TON pools
-  |           +-- services/advisor.ts  -->  deterministic recommendation engine
+  |           +-- packages/omniston    -->  Omniston SDK   -->  TON pools (STON.fi)
+  |           |                        -->  DefiLlama API  -->  cross-chain stable pools
+  |           +-- services/advisor.ts  -->  deterministic, bridge-cost-aware engine
   |           +-- MongoDB Atlas
   |
   v
-Approved quote  -->  Omniston executeRoute
-  |
+Approved quote
+  |--  same-chain  -->  Omniston tonBuildSwap        -->  poll TonAPI for txHash
+  |--  cross-chain -->  Omniston order (escrow/HTLC) -->  trackOrder lifecycle
   v
-Background coroutine polls TonAPI for txHash, updates run status
+Run status: executing -> completed | stuck | failed
 
 Any proposal  -->  buildAskMiraDeepLink (packages/shared)  -->  t.me/mira?text=...  -->  @mira (second opinion)
 ```
@@ -180,12 +185,14 @@ Any proposal  -->  buildAskMiraDeepLink (packages/shared)  -->  t.me/mira?text=.
 |---|---|
 | `users` | Wallet addresses and session tokens |
 | `policies` | Per-wallet rebalancing rules with full version history |
-| `runs` | Individual execution records (pending, executing, completed, failed, skipped) |
+| `runs` | Individual execution records (pending, executing, completed, failed, skipped, stuck) plus cross-chain metadata (destination chain, bridge cost, settlement type) |
 | `notifications` | Per-wallet notification preferences (approval mode, quiet hours, alert frequency) |
 
 ### Advisor engine
 
 Every quote, Telegram `/rebalance`, and notification-scanner candidate is evaluated by `evaluateRebalance()` (`apps/api/src/services/advisor.ts`) -- a single, deterministic, policy-driven function. It computes a `proceed` flag from the policy's minimum net-gain floor, a `confidence` score that scales with the margin above that floor and route size, and a templated plain-language `explanation`. Because the logic is transparent and reproducible rather than a black-box model call, every recommendation Tonyx makes can be explained and audited from the policy alone.
+
+For cross-chain candidates the advisor treats the estimated bridge cost and HTLC settlement risk as first-class inputs: the net-gain floor is raised (cross-chain routes must clear a higher bar than same-chain swaps, since settlement is not instant), confidence carries a settlement-risk penalty, and the explanation names the destination chain and bridge cost so the reasoning stays transparent. The coarse bridge-cost estimate is used only for ranking -- the authoritative number always comes from a live Omniston quote at execution time.
 
 ### Ask Mira for a second opinion
 
@@ -197,6 +204,9 @@ Mira (the [@mira](https://t.me/mira) Telegram bot) has no programmatic API -- on
 
 **Deterministic, policy-driven advisor**
 Before returning a quote, the API runs the candidate route through `evaluateRebalance()`. The response includes a `proceed` flag, a confidence score (0-1), and a plain-language explanation derived directly from the user's policy and the route's economics. If `proceed` is false, no `approvalToken` is issued and the frontend renders an explanation card with no Approve button.
+
+**Cross-chain yield rebalancing**
+Tonyx ranks TON-native pools alongside cross-chain stablecoin pools (USDC/USDT) on Ethereum, Base, BNB Chain, and Polygon, discovered from the DefiLlama Yields API. When a cross-chain route wins, it settles through Omniston's HTLC order flow: the TON side locks escrow, the order bridges, the HTLC secret is disclosed, and the position settles on the destination chain. The `runs` lifecycle tracks each phase and introduces a dedicated `stuck` status for partial fills or stalled settlements -- distinct from `failed`, because the funds remain safe in escrow pending resolution. The destination chain, bridge cost, and live settlement phase surface across the dashboard, Mini App, and Telegram. An EVM wallet (Reown AppKit) is connected additively alongside TON Connect, so TON-only users are never forced through the EVM leg.
 
 **Ask Mira for a second opinion**
 Every proposal -- in the Telegram bot and the web dashboard's `ProposalCard` -- carries an "Ask Mira for a second opinion" action. It opens a Telegram chat with [@mira](https://t.me/mira) pre-filled with the route, economics, and Tonyx's own reasoning, so the user can get an independent read from Telegram's AI teammate in one tap.
