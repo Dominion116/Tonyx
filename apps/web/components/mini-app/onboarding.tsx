@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
 import {
   ArrowRight,
   Check,
@@ -42,9 +43,14 @@ function Question({
 
 export function Onboarding() {
   const router = useRouter();
+  const { open: openEvmModal } = useAppKit();
+  const { address: evmAddress, isConnected: evmConnected } = useAppKitAccount({
+    namespace: 'eip155',
+  });
 
   const [step, setStep] = useState(1);
   const [connected, setConnected] = useState(false);
+  const [crosschain, setCrosschain] = useState(false);
   const [floor, setFloor] = useState(500);
   const [minGain, setMinGain] = useState(5);
   const [cooldown, setCooldown] = useState('6h');
@@ -115,16 +121,66 @@ export function Onboarding() {
                 </>
               )}
             </Button>
-            <button className="text-sm text-muted-foreground transition-colors hover:text-white">
-              Use an embedded wallet instead
+          </div>
+
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+            <div>
+              <p className="text-sm text-white">Hunt across other chains too</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Ethereum, Base, BNB Chain, Polygon — bridged via Omniston
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={crosschain}
+              onClick={() => setCrosschain((v) => !v)}
+              className={cn(
+                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
+                crosschain ? 'bg-accent' : 'bg-white/15'
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform',
+                  crosschain ? 'translate-x-[22px]' : 'translate-x-0.5'
+                )}
+              />
             </button>
           </div>
+
+          {crosschain && (
+            <div className="mt-3">
+              <p className="mb-2 text-xs text-muted-foreground">
+                Cross-chain rebalancing settles EVM-side orders, so it needs an
+                EVM wallet too.
+              </p>
+              <Button
+                size="lg"
+                variant={evmConnected ? 'outline' : 'default'}
+                className="w-full"
+                onClick={() => openEvmModal({ view: 'Connect' })}
+              >
+                {evmConnected && evmAddress ? (
+                  <>
+                    <Check className="h-5 w-5" aria-hidden="true" />
+                    EVM wallet connected
+                  </>
+                ) : (
+                  <>
+                    <Wallet className="h-5 w-5" aria-hidden="true" />
+                    Connect EVM wallet
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
 
           <div className="mt-auto pt-8">
             <Button
               size="lg"
               className="w-full"
-              disabled={!connected}
+              disabled={!connected || (crosschain && !evmConnected)}
               onClick={() => setStep(2)}
             >
               Continue
