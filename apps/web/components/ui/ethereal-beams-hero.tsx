@@ -422,7 +422,7 @@ const Beams: FC<BeamsProps> = ({
  * black & white theme for the entire Tonyx frontend.
  */
 export default function EtherealBeamsHero() {
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "tonyx_bot"
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ?? "ton_yx_bot"
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden bg-black">

@@ -1,10 +1,7 @@
 import type { Context } from 'telegraf';
 import { MIRA_SKILL_INSTALL_URL } from '@tonyx/shared';
-import { env } from '../../env.js';
 
-const MINI_APP_URL = env.isDev
-  ? 'https://tonyx.app' // placeholder until Phase 4 deploys the Mini App
-  : 'https://tonyx.app';
+const MINI_APP_URL = 'https://tonyx-web.vercel.app/';
 
 export async function handleStart(ctx: Context): Promise<void> {
   const firstName = ctx.from?.first_name ?? 'there';

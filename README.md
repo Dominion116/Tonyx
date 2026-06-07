@@ -88,8 +88,8 @@ Next.js 14 App Router with two layout groups: `(dashboard)` for the web experien
 ### Installation
 
 ```bash
-git clone https://github.com/oyewale-dominion/tonyx.git
-cd tonyx
+git clone https://github.com/Dominion116/Tonyx.git
+cd Tonyx
 npm install
 ```
 
@@ -252,12 +252,13 @@ The `apps/api` directory runs as a Render web service (API) and a separate backg
 
 Production cluster in the same region as Render. Network access is restricted to Render's static outbound IPs. Indexes on `walletAddress` (all collections) are created on API startup.
 
-### Domains
+### Live URLs
 
-| Domain | Target |
+| Surface | URL |
 |---|---|
-| `tonyx.app` | Vercel (frontend) |
-| `api.tonyx.app` | Render (backend) |
+| Web dashboard | [tonyx-web.vercel.app](https://tonyx-web.vercel.app/) |
+| API | [tonyx.onrender.com](https://tonyx.onrender.com) |
+| Telegram bot | [@ton_yx_bot](https://t.me/ton_yx_bot) |
 
 TLS is managed by both platforms.
 
@@ -265,7 +266,7 @@ TLS is managed by both platforms.
 
 ## API Reference
 
-Swagger UI is available at `http://localhost:4000/api/docs` in development and at `https://api.tonyx.app/api/docs` in production. Every endpoint is documented with JSDoc including request and response examples.
+Swagger UI is available at `http://localhost:4000/api/docs` in development and at `https://tonyx.onrender.com/api/docs` in production. Every endpoint is documented with JSDoc including request and response examples.
 
 ### Endpoint summary
 
