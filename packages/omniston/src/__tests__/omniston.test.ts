@@ -45,19 +45,33 @@ const MOCK_EVM_ORDER_PAYLOAD = {
   orderExtension: new Uint8Array([1, 2, 3]),
 };
 
+const USDT_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
+const USDC_ADDRESS = 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA';
+const TON_ADDRESS = 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c';
+
 const MOCK_POOLS_API = {
   pool_list: [
+    // Supported: both legs are USDC/USDT.
     {
       address: 'EQPool1',
-      token0_address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
-      token1_address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
+      token0_address: USDT_ADDRESS,
+      token1_address: USDC_ADDRESS,
       apy_1d: '12.5',
       lp_total_supply_usd: '1000000',
     },
+    // Unsupported: TON is not a stable — must be filtered out.
     {
       address: 'EQPool2',
-      token0_address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
-      token1_address: 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA',
+      token0_address: TON_ADDRESS,
+      token1_address: USDT_ADDRESS,
+      apy_1d: '8.0',
+      lp_total_supply_usd: '500000',
+    },
+    // Supported, null apy — exercises the 0-APR fallback.
+    {
+      address: 'EQPool3',
+      token0_address: USDC_ADDRESS,
+      token1_address: USDT_ADDRESS,
       apy_1d: null,
       lp_total_supply_usd: '200000',
     },
@@ -116,7 +130,7 @@ describe('discoverPools', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('maps STON.fi pool list to Pool[]', async () => {
+  it('maps STON.fi pool list to Pool[], keeping only USDC/USDT pools', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => MOCK_POOLS_API,
@@ -125,10 +139,13 @@ describe('discoverPools', () => {
     const { discoverPools } = await import('../pools.js');
     const pools = await discoverPools();
 
+    // EQPool2 (TON/USDT) is dropped — TON is not a supported stable.
     expect(pools).toHaveLength(2);
+    expect(pools.map((p) => p.id)).toEqual(['EQPool1', 'EQPool3']);
+    expect(pools.some((p) => p.name.includes('TON'))).toBe(false);
     expect(pools[0]).toMatchObject({
       id: 'EQPool1',
-      name: 'TON/USDT',
+      name: 'USDT/USDC',
       aprPercent: 12.5,
       liquidityUsdt: 1_000_000,
       isCrosschain: false,
@@ -157,6 +174,54 @@ describe('discoverPools', () => {
 
     const { discoverPools } = await import('../pools.js');
     await expect(discoverPools()).rejects.toThrow('503');
+  });
+});
+
+describe('discoverCrosschainPools', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  // DefiLlama wraps rows in { data: [...] } and capitalises chain names.
+  const MOCK_LLAMA_API = {
+    data: [
+      { pool: 'p1', chain: 'Ethereum', project: 'aave-v3', symbol: 'USDC', tvlUsd: 5_000_000, apy: 4.2 },
+      { pool: 'p2', chain: 'Base', project: 'morpho', symbol: 'USDC-USDT', tvlUsd: 2_000_000, apy: 6.1 },
+      { pool: 'p3', chain: 'BSC', project: 'venus', symbol: 'USDT', tvlUsd: 1_000_000, apy: 3.0 },
+      // Unsupported chain — dropped.
+      { pool: 'p4', chain: 'Solana', project: 'kamino', symbol: 'USDC', tvlUsd: 9_000_000, apy: 9.9 },
+      // Non-stable leg — dropped.
+      { pool: 'p5', chain: 'Ethereum', project: 'uni-v3', symbol: 'USDC-WETH', tvlUsd: 9_000_000, apy: 20 },
+      // Zero APY — dropped.
+      { pool: 'p6', chain: 'Polygon', project: 'aave-v3', symbol: 'USDT', tvlUsd: 1_000_000, apy: 0 },
+    ],
+  };
+
+  it('keeps only USDC/USDT pools on supported chains, normalising chain casing', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => MOCK_LLAMA_API,
+    } as Response);
+
+    const { discoverCrosschainPools } = await import('../pools.js');
+    const pools = await discoverCrosschainPools();
+
+    expect(pools.map((p) => p.id)).toEqual(['p1', 'p2', 'p3']);
+    expect(pools.every((p) => p.isCrosschain)).toBe(true);
+    // chain is the last '-' segment, even when the symbol itself contains '-'.
+    expect(pools.map((p) => p.assetPair.split('-').at(-1))).toEqual(['ethereum', 'base', 'bsc']);
+    expect(pools[0].estimatedBridgeCostUsdt).toBe(50); // ethereum
+  });
+
+  it('returns an empty list when the API is unavailable', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+    } as Response);
+
+    const { discoverCrosschainPools } = await import('../pools.js');
+    await expect(discoverCrosschainPools()).resolves.toEqual([]);
   });
 });
 
