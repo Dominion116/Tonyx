@@ -95,6 +95,10 @@ async function scanWallet(
     routedAmountUsdt: idleAmount,
     estimatedYieldUsdt: dailyYield,
     minNetGainUsdt: policy.minNetGainUsdt,
+    estimatedBridgeCostUsdt: topPool.estimatedBridgeCostUsdt,
+    destinationChain: topPool.isCrosschain
+      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      : undefined,
   });
 
   if (!rec.proceed) return;

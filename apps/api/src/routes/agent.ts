@@ -148,6 +148,10 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       minNetGainUsdt: activePolicy.minNetGainUsdt,
+      estimatedBridgeCostUsdt: topPool.estimatedBridgeCostUsdt,
+      destinationChain: topPool.isCrosschain
+        ? (topPool.assetPair.split('-')[1] ?? 'destination')
+        : undefined,
     });
 
     // ── Generate approval token ──────────────────────────────────────────────
