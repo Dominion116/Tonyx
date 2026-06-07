@@ -22,20 +22,20 @@ export const wagmiAdapter = new WagmiAdapter({
 
 export const wagmiConfig = wagmiAdapter.wagmiConfig;
 
-// Skip initialising the modal without a project ID (e.g. local dev before a
-// Reown Cloud project is wired up) — createAppKit would otherwise surface an
-// "invalid project ID" alert on every load.
-if (evmProjectId) {
-  createAppKit({
-    adapters: [wagmiAdapter],
-    networks: evmNetworks,
-    projectId: evmProjectId,
-    metadata: {
-      name: 'Tonyx',
-      description: 'Autonomous yield agent for the TON ecosystem',
-      url: 'https://tonyx-web.vercel.app',
-      icons: ['https://tonyx-web.vercel.app/icon.png'],
-    },
-    features: { analytics: false, email: false, socials: false },
-  });
-}
+// Always call createAppKit — it must run (and set the modal singleton) before
+// any page renders, including during Next.js static prerendering, or
+// useAppKit/useAppKitAccount throw "Please call createAppKit...". A missing
+// project ID just logs internally; it doesn't block rendering or surface a
+// user-facing alert (AlertController only opens a UI alert in debug mode).
+createAppKit({
+  adapters: [wagmiAdapter],
+  networks: evmNetworks,
+  projectId: evmProjectId,
+  metadata: {
+    name: 'Tonyx',
+    description: 'Autonomous yield agent for the TON ecosystem',
+    url: 'https://tonyx-web.vercel.app',
+    icons: ['https://tonyx-web.vercel.app/icon.png'],
+  },
+  features: { analytics: false, email: false, socials: false },
+});
