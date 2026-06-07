@@ -1,4 +1,4 @@
-export { discoverPools } from './pools.js';
+export { discoverPools, discoverCrosschainPools } from './pools.js';
 export { getQuote } from './quote.js';
 export { executeRoute, registerSignedOrder } from './execute.js';
 export { trackSwap, trackOrder, discloseHtlcSecret } from './track.js';

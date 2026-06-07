@@ -1,18 +1,26 @@
 import cron from 'node-cron';
-import { discoverPools } from '@tonyx/omniston';
+import { discoverPools, discoverCrosschainPools } from '@tonyx/omniston';
 import { PoolCacheModel } from '../db/index.js';
 
 const CACHE_KEY = 'latest';
 
 export async function refreshPoolCache(): Promise<void> {
   try {
-    const pools = await discoverPools();
+    const [nativePools, crosschainPools] = await Promise.all([
+      discoverPools(),
+      discoverCrosschainPools(),
+    ]);
+
+    const pools = [...nativePools, ...crosschainPools];
+
     await PoolCacheModel.findByIdAndUpdate(
       CACHE_KEY,
       { pools, cachedAt: new Date() },
       { upsert: true, new: true },
     );
-    console.log(`[pool-scanner] Refreshed ${pools.length} pools`);
+    console.log(
+      `[pool-scanner] Refreshed ${pools.length} pools (${nativePools.length} native, ${crosschainPools.length} cross-chain)`,
+    );
   } catch (err) {
     console.error('[pool-scanner] Refresh failed:', err);
   }
