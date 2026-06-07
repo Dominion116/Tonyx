@@ -112,7 +112,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
     // ── Cross-chain route metadata ───────────────────────────────────────────
     const isCrosschain = topPool.isCrosschain === true;
     const destinationChain = isCrosschain
-      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      ? (topPool.assetPair.split('-').at(-1) ?? 'destination')
       : undefined;
     const bridgeCostUsdt = topPool.estimatedBridgeCostUsdt;
     const settlementType: 'swap' | 'order' = isCrosschain ? 'order' : 'swap';

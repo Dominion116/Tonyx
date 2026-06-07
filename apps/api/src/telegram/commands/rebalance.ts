@@ -63,7 +63,7 @@ export async function handleRebalance(ctx: Context): Promise<void> {
 
     const isCrosschain = topPool.isCrosschain === true;
     const destinationChain = isCrosschain
-      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      ? (topPool.assetPair.split('-').at(-1) ?? 'destination')
       : undefined;
     const bridgeCostUsdt = topPool.estimatedBridgeCostUsdt;
 

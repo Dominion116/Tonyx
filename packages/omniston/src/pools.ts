@@ -13,13 +13,13 @@ const KNOWN_SYMBOLS: Record<string, string> = {
   'EQDmkj65Ab_m0aZaW8IpKw4kYqd5Bv5ZkE_2WDNRW7AAAAA': 'stTON',
 };
 
-// Stablecoin symbols we're interested in for cross-chain yields
-const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC']);
+// The only assets Tonyx rebalances into — USDC and USDT, on every chain.
+const SUPPORTED_STABLES = new Set(['USDC', 'USDT']);
 
-// Chains we support for cross-chain settlement
+// Chains we support for cross-chain settlement (canonical lowercase keys).
 const SUPPORTED_CHAINS = new Set(['ethereum', 'base', 'bsc', 'polygon']);
 
-// Coarse bridge cost estimates (USD) per chain pair, from TON to destination
+// Coarse bridge cost estimates (USD) per chain, from TON to destination.
 const BRIDGE_COSTS: Record<string, number> = {
   ethereum: 50,
   base: 10,
@@ -29,6 +29,16 @@ const BRIDGE_COSTS: Record<string, number> = {
 
 function symbol(address: string): string {
   return KNOWN_SYMBOLS[address] ?? `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+/**
+ * True only if every asset in a pool symbol is a supported stable (USDC/USDT).
+ * Handles single-asset lending pools ("USDC") and stable LP pairs ("USDC-USDT"),
+ * while rejecting anything with a non-stable leg ("USDC-WETH", "USDT-TON").
+ */
+function isStableOnly(poolSymbol: string): boolean {
+  const parts = poolSymbol.split('-').map((s) => s.trim().toUpperCase());
+  return parts.length > 0 && parts.every((p) => SUPPORTED_STABLES.has(p));
 }
 
 interface StonPool {
@@ -64,18 +74,21 @@ export async function discoverPools(): Promise<Pool[]> {
 
   return data.pool_list
     .filter((p) => !p.deprecated)
-    .map((p): Pool => {
+    .map((p) => {
       const sym0 = symbol(p.token0_address);
       const sym1 = symbol(p.token1_address);
-      return {
-        id: p.address,
-        name: `${sym0}/${sym1}`,
-        assetPair: `${p.token0_address}:${p.token1_address}`,
-        aprPercent: p.apy_1d ? parseFloat(p.apy_1d) : 0,
-        liquidityUsdt: p.lp_total_supply_usd ? parseFloat(p.lp_total_supply_usd) : 0,
-        isCrosschain: false,
-      };
-    });
+      return { p, sym0, sym1 };
+    })
+    // Only USDC/USDT pools — both legs must be a supported stable.
+    .filter(({ sym0, sym1 }) => SUPPORTED_STABLES.has(sym0) && SUPPORTED_STABLES.has(sym1))
+    .map(({ p, sym0, sym1 }): Pool => ({
+      id: p.address,
+      name: `${sym0}/${sym1}`,
+      assetPair: `${p.token0_address}:${p.token1_address}`,
+      aprPercent: p.apy_1d ? parseFloat(p.apy_1d) : 0,
+      liquidityUsdt: p.lp_total_supply_usd ? parseFloat(p.lp_total_supply_usd) : 0,
+      isCrosschain: false,
+    }));
 }
 
 export async function discoverCrosschainPools(): Promise<Pool[]> {
@@ -86,22 +99,24 @@ export async function discoverCrosschainPools(): Promise<Pool[]> {
       return [];
     }
 
-    const data = (await res.json()) as DefiLlamaPool[];
+    // DefiLlama's response wraps the pool array in a `data` field.
+    const json = (await res.json()) as { data?: DefiLlamaPool[] } | DefiLlamaPool[];
+    const data = Array.isArray(json) ? json : (json.data ?? []);
 
     return data
+      .map((p) => ({ p, chain: p.chain.toLowerCase() }))
+      // DefiLlama capitalises chain names ("Ethereum", "BSC"); normalise before matching.
       .filter(
-        (p) =>
-          SUPPORTED_CHAINS.has(p.chain) &&
-          p.apy > 0 &&
-          p.tvlUsd > 0 &&
-          STABLECOIN_SYMBOLS.has(p.symbol),
+        ({ p, chain }) =>
+          SUPPORTED_CHAINS.has(chain) && p.apy > 0 && p.tvlUsd > 0 && isStableOnly(p.symbol),
       )
-      .map((p): Pool => {
-        const bridgeCost = BRIDGE_COSTS[p.chain] ?? 15;
+      .map(({ p, chain }): Pool => {
+        const bridgeCost = BRIDGE_COSTS[chain] ?? 15;
         return {
           id: p.pool,
           name: `${p.symbol} (${p.project})`,
-          assetPair: `${p.symbol}-${p.chain}`,
+          // chain is the last '-' segment so the symbol may itself contain '-' (e.g. USDC-USDT).
+          assetPair: `${p.symbol}-${chain}`,
           aprPercent: p.apy,
           liquidityUsdt: p.tvlUsd,
           isCrosschain: true,

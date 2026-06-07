@@ -92,7 +92,7 @@ async function scanWallet(
   const crosschain: CrosschainMeta = {
     isCrosschain,
     destinationChain: isCrosschain
-      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      ? (topPool.assetPair.split('-').at(-1) ?? 'destination')
       : undefined,
     bridgeCostUsdt: topPool.estimatedBridgeCostUsdt,
   };
