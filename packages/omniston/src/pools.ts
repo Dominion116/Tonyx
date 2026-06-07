@@ -14,7 +14,7 @@ const KNOWN_SYMBOLS: Record<string, string> = {
 };
 
 // Stablecoin symbols we're interested in for cross-chain yields
-const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC', 'DAI', 'USDE', 'MIM', 'FRAX', 'crvUSD']);
+const STABLECOIN_SYMBOLS = new Set(['USDT', 'USDC']);
 
 // Chains we support for cross-chain settlement
 const SUPPORTED_CHAINS = new Set(['ethereum', 'base', 'bsc', 'polygon']);

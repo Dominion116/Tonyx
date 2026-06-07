@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { discoverPools } from '@tonyx/omniston';
+import { discoverPools, discoverCrosschainPools } from '@tonyx/omniston';
 import type { PoolsResponse } from '@tonyx/shared';
 import { getPoolsFromCache } from '../cron/poolScanner.js';
 import { TtlCache } from '../services/cache.js';
@@ -52,7 +52,11 @@ router.get('/', async (_req, res, next) => {
       cachedAt = (dbCache.cachedAt as Date).toISOString();
     } else {
       // Cold start or DB unavailable — fetch live
-      pools = await discoverPools();
+      const [nativePools, crosschainPools] = await Promise.all([
+        discoverPools(),
+        discoverCrosschainPools(),
+      ]);
+      pools = [...nativePools, ...crosschainPools];
       cachedAt = new Date().toISOString();
     }
 
