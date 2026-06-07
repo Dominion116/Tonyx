@@ -9,6 +9,13 @@
 const MIRA_USERNAME = 'mira';
 export const TONYX_PROPOSAL_TAG = '[TONYX PROPOSAL]';
 
+/**
+ * One-tap install link for the "Tonyx Rebalance Reviewer" custom skill.
+ * Installing it lets @mira recognize the TONYX_PROPOSAL_TAG and respond as a
+ * second-opinion reviewer instead of a generic assistant. See MIRA_SKILL.md.
+ */
+export const MIRA_SKILL_INSTALL_URL = 'https://t.me/mira?start=skill_vBuSTLd7';
+
 export interface AskMiraProposal {
   originPool: string;
   destinationPool: string;

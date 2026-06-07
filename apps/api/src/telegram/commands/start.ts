@@ -1,4 +1,5 @@
 import type { Context } from 'telegraf';
+import { MIRA_SKILL_INSTALL_URL } from '@tonyx/shared';
 import { env } from '../../env.js';
 
 const MINI_APP_URL = env.isDev
@@ -11,8 +12,11 @@ export async function handleStart(ctx: Context): Promise<void> {
   await ctx.reply(
     `👋 Hey ${firstName}!\n\n` +
     `*Tonyx* is your autonomous yield agent on TON. It monitors STON.fi pools, ` +
-    `evaluates opportunities using Mira AI, and rebalances your idle USDT when the math makes sense — ` +
+    `weighs every opportunity with a transparent advisor engine, and rebalances your idle USDT when the math makes sense — ` +
     `only within limits you set.\n\n` +
+    `💡 *Tip:* every proposal has an "Ask Mira for a second opinion" button that opens ` +
+    `[@mira](https://t.me/mira) with the route pre-filled. Install the Tonyx Reviewer skill below ` +
+    `(one tap, no setup) so Mira replies with a proper second opinion instead of a generic answer.\n\n` +
     `*What you can do here:*\n` +
     `• /status — check your balance and active position\n` +
     `• /rebalance — request a yield proposal right now\n` +
@@ -27,6 +31,12 @@ export async function handleStart(ctx: Context): Promise<void> {
             {
               text: '🚀 Launch Tonyx',
               url: MINI_APP_URL,
+            },
+          ],
+          [
+            {
+              text: '🔮 Install Tonyx Reviewer skill for Mira',
+              url: MIRA_SKILL_INSTALL_URL,
             },
           ],
         ],

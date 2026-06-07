@@ -36,9 +36,9 @@ const capabilities = [
     icon: TrendingUp,
   },
   {
-    title: 'Mira AI reasoning',
+    title: 'Transparent advisor reasoning',
     description:
-      'Each move is evaluated and explained in plain language, so you understand the why before approving.',
+      'Each move is scored and explained in plain language by a deterministic advisor engine, so you understand the why before approving — and you can always ask Mira for a second opinion.',
     icon: Brain,
   },
   {
@@ -65,7 +65,7 @@ const faqs = [
   {
     question: 'What is Tonyx?',
     answer:
-      'Tonyx is an autonomous yield optimization agent on the TON blockchain. It scans liquidity venues, reasons about the best moves with Mira AI, and rebalances your funds to keep them earning.',
+      'Tonyx is an autonomous yield optimization agent on the TON blockchain. It scans liquidity venues, weighs every move with a transparent advisor engine, and rebalances your funds to keep them earning — with a one-tap option to ask Mira for a second opinion on any proposal.',
     icon: HelpCircle,
   },
   {

@@ -4,7 +4,7 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Tonyx: Autonomous yield on TON',
   description:
-    'Tonyx is an autonomous yield agent for the TON ecosystem. It scans STON.fi pools, reasons with Mira AI, and rebalances your idle USDT within limits you set.',
+    'Tonyx is an autonomous yield agent for the TON ecosystem. It scans STON.fi pools, weighs every move with a transparent advisor engine, and rebalances your idle USDT within limits you set.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

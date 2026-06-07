@@ -7,8 +7,20 @@ document is the configuration to paste into Mira's custom-skill editor, plus the
 reasoning behind it, so the "Ask Mira for a second opinion" button in Tonyx
 produces a genuinely useful reply rather than a generic one.
 
+## Install the skill
+
+The skill is built and live. Anyone can add it to their own Mira with this one-tap link:
+
+**https://t.me/mira?start=skill_vBuSTLd7**
+
+Tapping it opens a chat with [@mira](https://t.me/mira) and offers to install "Tonyx Rebalance Reviewer"
+directly — no manual configuration needed. This is the link to share in the bot's description,
+the `/start` message, and the hackathon submission.
+
 ## How the bridge works end to end
 
+0. The user installs the skill once via the link above (prompted from Tonyx's own
+   `/start` message or bot description).
 1. A user reviews a Tonyx rebalance proposal (Telegram bot or web dashboard).
 2. They tap **"🔮 Ask Mira for a second opinion"**.
 3. This opens `https://t.me/mira?text=<encoded message>` — built by

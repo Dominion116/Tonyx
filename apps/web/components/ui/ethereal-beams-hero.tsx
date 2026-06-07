@@ -499,7 +499,7 @@ export default function EtherealBeamsHero() {
             {/* Badge */}
             <div className="mb-8 inline-flex items-center gap-2 rounded-full bg-accent/10 backdrop-blur-xl border border-accent/20 px-4 py-2 text-sm text-white/90">
               <Star className="h-4 w-4 text-accent" aria-hidden="true" />
-              {"Powered by Mira AI · Built on TON"}
+              {"Ask Mira for a second opinion · Built on TON"}
             </div>
 
             {/* Main Heading */}
@@ -514,8 +514,8 @@ export default function EtherealBeamsHero() {
 
             {/* Subtitle */}
             <p className="mb-10 text-lg leading-8 text-white/80 sm:text-xl lg:text-2xl max-w-3xl mx-auto">
-              Tonyx is an autonomous agent that scans STON.fi pools, reasons with Mira AI, and rebalances your idle
-              USDT, only within the limits you set. No monitoring. No manual swaps.
+              Tonyx is an autonomous agent that scans STON.fi pools, weighs every move with a transparent advisor
+              engine, and rebalances your idle USDT, only within the limits you set. No monitoring. No manual swaps.
             </p>
 
             {/* CTA Buttons */}
