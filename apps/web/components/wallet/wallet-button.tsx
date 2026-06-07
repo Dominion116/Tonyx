@@ -25,22 +25,23 @@ function EvmWalletChip() {
     return (
       <button
         onClick={() => open({ view: 'Connect' })}
-        className="hidden h-9 items-center gap-1.5 rounded-full border border-white/10 px-3 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white sm:flex"
+        className="flex h-9 items-center gap-1.5 rounded-full border border-white/10 px-3 text-xs font-medium text-white/60 transition-colors hover:border-white/20 hover:text-white"
       >
         <Wallet className="h-3.5 w-3.5" aria-hidden="true" />
-        EVM wallet
+        <span className="hidden sm:inline">EVM wallet</span>
       </button>
     );
   }
 
   return (
-    <div className="relative hidden sm:block">
+    <div className="relative">
       <button
         onClick={() => setMenuOpen((v) => !v)}
         className="flex h-9 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/80 transition-colors hover:bg-white/10"
       >
         <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden="true" />
-        EVM {truncate(address)}
+        <span className="hidden sm:inline">EVM </span>
+        {truncate(address)}
         <ChevronDown className="h-3.5 w-3.5 text-white/60" aria-hidden="true" />
       </button>
 
