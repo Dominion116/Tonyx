@@ -26,6 +26,11 @@ export function getBot(): Telegraf {
 
     // Inline keyboard callback handler
     bot.on('callback_query', handleCallbackQuery);
+
+    // Catch-all so a thrown error in any handler is logged instead of swallowed
+    bot.catch((err, ctx) => {
+      console.error(`[telegram] Unhandled error for update ${ctx.update.update_id}:`, err);
+    });
   }
   return bot;
 }
@@ -40,7 +45,7 @@ export async function registerBotCommands(): Promise<void> {
     await b.telegram.setMyCommands([
       { command: 'start',     description: 'Welcome message and launch Tonyx' },
       { command: 'status',    description: 'Your current balance and active position' },
-      { command: 'rebalance', description: 'Request a Mira-evaluated rebalance proposal' },
+      { command: 'rebalance', description: 'Request an advisor-evaluated rebalance proposal' },
       { command: 'policy',    description: 'View your active yield policy' },
       { command: 'history',   description: 'Last five rebalance runs' },
     ]);
