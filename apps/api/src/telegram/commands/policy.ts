@@ -35,7 +35,7 @@ export async function handlePolicy(ctx: Context): Promise<void> {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '✏️ Edit in app', url: 'https://tonyx-web.vercel.app/policy' }],
+          [{ text: '✏️ Edit in app', web_app: { url: 'https://tonyx-web.vercel.app/mini-app/settings' } }],
         ],
       },
     });

@@ -1,7 +1,7 @@
 import type { Context } from 'telegraf';
 import { MIRA_SKILL_INSTALL_URL } from '@tonyx/shared';
 
-const MINI_APP_URL = 'https://tonyx-web.vercel.app/';
+const MINI_APP_URL = 'https://tonyx-web.vercel.app/mini-app';
 
 export async function handleStart(ctx: Context): Promise<void> {
   const firstName = ctx.from?.first_name ?? 'there';
@@ -34,7 +34,7 @@ export async function handleStart(ctx: Context): Promise<void> {
             [
               {
                 text: '🚀 Launch Tonyx',
-                url: MINI_APP_URL,
+                web_app: { url: MINI_APP_URL },
               },
             ],
           ],
