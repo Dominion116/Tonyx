@@ -39,8 +39,11 @@ const spec = swaggerJsdoc({
     },
     security: [{ bearerAuth: [] }],
   },
-  // Scan all route files for JSDoc annotations
-  apis: ['./src/routes/**/*.ts'],
+  // Scan compiled route files for JSDoc annotations. `__dirname` and the
+  // running file's extension adapt this to both `tsx` (src/*.ts) and the
+  // compiled build (dist/*.js) — a hardcoded `./src/**/*.ts` glob matches
+  // nothing once the app runs from `dist`, leaving the spec empty.
+  apis: [`${__dirname}/routes/**/*.${__filename.endsWith('.ts') ? 'ts' : 'js'}`],
 });
 
 export function createSwaggerRouter(): Router {
