@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const ONBOARDED_KEY = 'tonyx_onboarded';
+export const ONBOARDED_KEY = 'tonyx_onboarded';
 const TOTAL_STEPS = 4;
 
 const minGainPresets = [5, 10, 25];
