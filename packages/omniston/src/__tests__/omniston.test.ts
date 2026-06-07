@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { OmnistonQuote } from '../types.js';
 
 // --- shared mock data -------------------------------------------------------
 
-const MOCK_QUOTE = {
+const MOCK_SWAP_QUOTE = {
   rfqId: 'rfq-1',
   quoteId: 'q-1',
   resolverName: 'TestResolver',
@@ -17,38 +18,60 @@ const MOCK_QUOTE = {
   resolverId: 'resolver-1',
 };
 
+const MOCK_TON_ORDER_QUOTE = {
+  ...MOCK_SWAP_QUOTE,
+  quoteId: 'q-2',
+  settlementData: { $case: 'order', value: { srcProtocolContractAddress: { chain: { $case: 'ton', value: 'EQEscrow' } }, resolverSendsUnits: '2500000', tradeStartDeadline: 0, exclusivityTimeout: 0, integratorFeePips: 0, protocolFeePips: 0 } },
+  inputAsset: { chain: { $case: 'ton', value: { kind: { $case: 'jetton', value: 'EQUsdtJetton' } } } },
+  outputAsset: { chain: { $case: 'ethereum', value: { kind: { $case: 'erc20', value: '0xUSDC' } } } },
+};
+
+const MOCK_EVM_ORDER_QUOTE = {
+  ...MOCK_SWAP_QUOTE,
+  quoteId: 'q-3',
+  settlementData: { $case: 'order', value: { srcProtocolContractAddress: { chain: { $case: 'ethereum', value: '0xProtocol' } }, resolverSendsUnits: '2500000', tradeStartDeadline: 0, exclusivityTimeout: 0, integratorFeePips: 0, protocolFeePips: 0 } },
+  inputAsset: { chain: { $case: 'ethereum', value: { kind: { $case: 'erc20', value: '0xUSDC' } } } },
+  outputAsset: { chain: { $case: 'ton', value: { kind: { $case: 'jetton', value: 'EQUsdtJetton' } } } },
+};
+
 const MOCK_TRANSACTION = {
   messages: [
-    { address: 'EQPool123', amount: '1000000000', payload: 'base64payload==' },
+    { targetAddress: 'EQPool123', sendAmount: '1000000000', payload: 'base64payload==' },
   ],
+};
+
+const MOCK_EVM_ORDER_PAYLOAD = {
+  typedData: '{"types":{}}',
+  orderExtension: new Uint8Array([1, 2, 3]),
 };
 
 const MOCK_POOLS_API = {
   pool_list: [
     {
       address: 'EQPool1',
-      token0_address: 'EQTON',
-      token1_address: 'EQUsdt',
-      token0_symbol: 'TON',
-      token1_symbol: 'USDT',
+      token0_address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
+      token1_address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
       apy_1d: '12.5',
-      reserve0_usd: '500000',
-      reserve1_usd: '500000',
+      lp_total_supply_usd: '1000000',
     },
     {
       address: 'EQPool2',
-      token0_address: 'EQUsdt',
-      token1_address: 'EQUsdc',
-      token0_symbol: 'USDT',
-      token1_symbol: 'USDC',
+      token0_address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
+      token1_address: 'EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA',
       apy_1d: null,
-      reserve0_usd: '200000',
-      reserve1_usd: null,
+      lp_total_supply_usd: '200000',
     },
   ],
 };
 
 // --- mock Omniston SDK ------------------------------------------------------
+
+function settlementCase(q: unknown): string | undefined {
+  if (typeof q !== 'object' || q === null || !('settlementData' in q)) return undefined;
+  const data = (q as Record<string, unknown>).settlementData;
+  if (typeof data !== 'object' || data === null) return undefined;
+  return (data as { $case: string }).$case;
+}
 
 vi.mock('@ston-fi/omniston-sdk', () => {
   const Observable = {
@@ -58,17 +81,20 @@ vi.mock('@ston-fi/omniston-sdk', () => {
   const mockClient = {
     requestForQuote: vi.fn(() => Observable),
     tonBuildSwap: vi.fn(() => Promise.resolve(MOCK_TRANSACTION)),
+    tonBuildEscrowTransfer: vi.fn(() => Promise.resolve(MOCK_TRANSACTION)),
+    evmBuildOrderPayload: vi.fn(() => Promise.resolve(MOCK_EVM_ORDER_PAYLOAD)),
+    orderRegisterSignedOrder: vi.fn(() => Promise.resolve(undefined)),
+    swapTrack: vi.fn(() => Observable),
+    orderTrack: vi.fn(() => Observable),
+    orderDiscloseHtlcSecret: vi.fn(() => Promise.resolve(undefined)),
   };
 
   return {
     Omniston: vi.fn(() => mockClient),
     AutoReconnectTransport: vi.fn(),
     WebSocketTransport: vi.fn(),
-    isSwapQuote: (q: unknown) =>
-      typeof q === 'object' && q !== null && 'settlementData' in q &&
-      (q as Record<string, unknown>).settlementData !== null &&
-      typeof (q as Record<string, unknown>).settlementData === 'object' &&
-      ((q as Record<string, { $case: string }>).settlementData).$case === 'swap',
+    isSwapQuote: (q: unknown) => settlementCase(q) === 'swap',
+    isOrderQuote: (q: unknown) => settlementCase(q) === 'order',
   };
 });
 
@@ -142,26 +168,50 @@ describe('getQuote', () => {
     vi.mocked(client.requestForQuote).mockReturnValueOnce({
       subscribe: (observer: { next: (e: unknown) => void }) => {
         observer.next({ $case: 'ack', value: { rfqId: 'rfq-1' } });
-        observer.next({ $case: 'quoteUpdated', rfqId: 'rfq-1', value: MOCK_QUOTE });
+        observer.next({ $case: 'quoteUpdated', rfqId: 'rfq-1', value: MOCK_SWAP_QUOTE });
         return { unsubscribe: vi.fn() };
       },
     } as unknown as ReturnType<typeof client.requestForQuote>);
 
     const { getQuote } = await import('../quote.js');
     const result = await getQuote({
-      inputAsset: 'native',
-      outputAsset: 'EQAddress123',
-      inputAmountNano: '1000000000',
-      traderAddress: 'EQTrader',
+      inputAsset: { chain: 'ton', kind: 'native' },
+      outputAsset: { chain: 'ton', kind: 'jetton', address: 'EQAddress123' },
+      inputAmountUnits: '1000000000',
+      traderAddress: { chain: 'ton', address: 'EQTrader' },
     });
 
     expect(result.rfqId).toBe('rfq-1');
     expect(result.quoteId).toBe('q-1');
     expect(result.resolverName).toBe('TestResolver');
     expect(result.outputUnits).toBe('2500000');
+    expect(result.settlementMethod).toBe('swap');
+    expect(result.traderAddress).toEqual({ chain: 'ton', address: 'EQTrader' });
   });
 
-  it('rejects after timeoutMs when no swap quote is received', async () => {
+  it('rejects when the server reports no route for the pair', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+
+    vi.mocked(client.requestForQuote).mockReturnValueOnce({
+      subscribe: (observer: { next: (e: unknown) => void }) => {
+        observer.next({ $case: 'noQuote', rfqId: 'rfq-1', value: {} });
+        return { unsubscribe: vi.fn() };
+      },
+    } as unknown as ReturnType<typeof client.requestForQuote>);
+
+    const { getQuote } = await import('../quote.js');
+    await expect(
+      getQuote({
+        inputAsset: { chain: 'ton', kind: 'native' },
+        outputAsset: { chain: 'ton', kind: 'jetton', address: 'EQAddress123' },
+        inputAmountUnits: '1000000000',
+        traderAddress: { chain: 'ton', address: 'EQTrader' },
+      }),
+    ).rejects.toThrow('no route');
+  });
+
+  it('rejects after timeoutMs when no quote is received', async () => {
     const { getClient } = await import('../client.js');
     const client = getClient();
 
@@ -172,10 +222,10 @@ describe('getQuote', () => {
     const { getQuote } = await import('../quote.js');
     await expect(
       getQuote({
-        inputAsset: 'native',
-        outputAsset: 'EQAddress123',
-        inputAmountNano: '1000000000',
-        traderAddress: 'EQTrader',
+        inputAsset: { chain: 'ton', kind: 'native' },
+        outputAsset: { chain: 'ton', kind: 'jetton', address: 'EQAddress123' },
+        inputAmountUnits: '1000000000',
+        traderAddress: { chain: 'ton', address: 'EQTrader' },
         timeoutMs: 50,
       }),
     ).rejects.toThrow('timed out');
@@ -183,28 +233,163 @@ describe('getQuote', () => {
 });
 
 describe('executeRoute', () => {
-  it('calls tonBuildSwap and returns transaction payload', async () => {
+  it('builds a TON swap transaction for same-chain swap quotes', async () => {
     const { getClient } = await import('../client.js');
     const client = getClient();
-
-    vi.mocked(client.tonBuildSwap).mockResolvedValueOnce(
-      MOCK_TRANSACTION as unknown as Awaited<ReturnType<typeof client.tonBuildSwap>>,
-    );
+    vi.mocked(client.tonBuildSwap).mockClear();
 
     const { executeRoute } = await import('../execute.js');
-    const result = await executeRoute({
-      quote: {
-        rfqId: 'rfq-1',
-        quoteId: 'q-1',
-        resolverName: 'TestResolver',
-        inputUnits: '1000000000',
-        outputUnits: '2500000',
-        raw: MOCK_QUOTE as unknown as import('@ston-fi/omniston-sdk').Quote,
-      },
-      receiveAddress: 'EQReceiver',
+    const quote: OmnistonQuote = {
+      rfqId: 'rfq-1',
+      quoteId: 'q-1',
+      resolverName: 'TestResolver',
+      inputAsset: { chain: 'ton', kind: 'native' },
+      outputAsset: { chain: 'ton', kind: 'jetton', address: 'EQAddress123' },
+      inputUnits: '1000000000',
+      outputUnits: '2500000',
+      settlementMethod: 'swap',
+      traderAddress: { chain: 'ton', address: 'EQTrader' },
+      raw: MOCK_SWAP_QUOTE as unknown as OmnistonQuote['raw'],
+    };
+
+    const result = await executeRoute({ quote, receiveAddress: { chain: 'ton', address: 'EQReceiver' } });
+
+    expect(result).toEqual({ kind: 'tonTransaction', transaction: MOCK_TRANSACTION });
+    expect(client.tonBuildSwap).toHaveBeenCalledWith({
+      quoteId: 'q-1',
+      transferSrcAddress: { chain: { $case: 'ton', value: 'EQTrader' } },
+      traderDstAddress: { chain: { $case: 'ton', value: 'EQReceiver' } },
+    });
+  });
+
+  it('builds a TON escrow transfer for cross-chain orders funded from TON', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.tonBuildEscrowTransfer).mockClear();
+
+    const { executeRoute } = await import('../execute.js');
+    const quote: OmnistonQuote = {
+      rfqId: 'rfq-2',
+      quoteId: 'q-2',
+      resolverName: 'TestResolver',
+      inputAsset: { chain: 'ton', kind: 'jetton', address: 'EQUsdtJetton' },
+      outputAsset: { chain: 'ethereum', kind: 'erc20', address: '0xUSDC' },
+      inputUnits: '1000000000',
+      outputUnits: '2500000',
+      settlementMethod: 'order',
+      traderAddress: { chain: 'ton', address: 'EQTrader' },
+      raw: MOCK_TON_ORDER_QUOTE as unknown as OmnistonQuote['raw'],
+    };
+
+    const result = await executeRoute({ quote });
+
+    expect(result).toEqual({ kind: 'tonTransaction', transaction: MOCK_TRANSACTION });
+    expect(client.tonBuildEscrowTransfer).toHaveBeenCalledWith({
+      quoteId: 'q-2',
+      ownerSrcAddress: { chain: { $case: 'ton', value: 'EQTrader' } },
+      traderDstAddress: undefined,
+    });
+  });
+
+  it('builds an EVM order payload for cross-chain orders funded from an EVM chain', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.evmBuildOrderPayload).mockClear();
+
+    const { executeRoute } = await import('../execute.js');
+    const quote: OmnistonQuote = {
+      rfqId: 'rfq-3',
+      quoteId: 'q-3',
+      resolverName: 'TestResolver',
+      inputAsset: { chain: 'ethereum', kind: 'erc20', address: '0xUSDC' },
+      outputAsset: { chain: 'ton', kind: 'jetton', address: 'EQUsdtJetton' },
+      inputUnits: '1000000000',
+      outputUnits: '2500000',
+      settlementMethod: 'order',
+      traderAddress: { chain: 'ethereum', address: '0xTrader' },
+      raw: MOCK_EVM_ORDER_QUOTE as unknown as OmnistonQuote['raw'],
+    };
+
+    const result = await executeRoute({ quote, receiveAddress: { chain: 'ton', address: 'EQReceiver' } });
+
+    expect(result).toEqual({ kind: 'evmOrderPayload', payload: MOCK_EVM_ORDER_PAYLOAD });
+    expect(client.evmBuildOrderPayload).toHaveBeenCalledWith({
+      quoteId: 'q-3',
+      ownerSrcAddress: { chain: { $case: 'ethereum', value: '0xTrader' } },
+      traderDstAddress: { chain: { $case: 'ton', value: 'EQReceiver' } },
+    });
+  });
+});
+
+describe('registerSignedOrder', () => {
+  it('forwards the signed order and owner address to the protocol', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.orderRegisterSignedOrder).mockClear();
+
+    const { registerSignedOrder } = await import('../execute.js');
+    const signedOrder = {
+      order: { $case: 'evmV1', value: { encodedOrder: new Uint8Array(), signature: new Uint8Array(), orderExtension: new Uint8Array() } },
+    } as unknown as Parameters<typeof registerSignedOrder>[0]['signedOrder'];
+
+    await registerSignedOrder({
+      quoteId: 'q-3',
+      ownerAddress: { chain: 'ethereum', address: '0xTrader' },
+      signedOrder,
     });
 
-    expect(result.transaction).toEqual(MOCK_TRANSACTION);
-    expect(client.tonBuildSwap).toHaveBeenCalledOnce();
+    expect(client.orderRegisterSignedOrder).toHaveBeenCalledWith({
+      quoteId: 'q-3',
+      ownerSrcAddress: { chain: { $case: 'ethereum', value: '0xTrader' } },
+      signedOrder,
+      serializedOrderDetails: undefined,
+    });
+  });
+});
+
+describe('trackSwap', () => {
+  it('subscribes to swap progress with a chain-tagged trader address', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.swapTrack).mockClear();
+
+    const { trackSwap } = await import('../track.js');
+    trackSwap({ quoteId: 'q-1', traderAddress: { chain: 'ton', address: 'EQTrader' }, outgoingTxQuery: 'tx-hash' });
+
+    expect(client.swapTrack).toHaveBeenCalledWith({
+      quoteId: 'q-1',
+      traderAddress: { chain: { $case: 'ton', value: 'EQTrader' } },
+      outgoingTxQuery: 'tx-hash',
+    });
+  });
+});
+
+describe('trackOrder', () => {
+  it('subscribes to order status with a chain-tagged trader address', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.orderTrack).mockClear();
+
+    const { trackOrder } = await import('../track.js');
+    trackOrder({ quoteId: 'q-3', traderAddress: { chain: 'ethereum', address: '0xTrader' } });
+
+    expect(client.orderTrack).toHaveBeenCalledWith({
+      quoteId: 'q-3',
+      traderAddress: { chain: { $case: 'ethereum', value: '0xTrader' } },
+    });
+  });
+});
+
+describe('discloseHtlcSecret', () => {
+  it('forwards the secret for the given execution index', async () => {
+    const { getClient } = await import('../client.js');
+    const client = getClient();
+    vi.mocked(client.orderDiscloseHtlcSecret).mockClear();
+
+    const { discloseHtlcSecret } = await import('../track.js');
+    const secret = new Uint8Array([1, 2, 3]);
+    await discloseHtlcSecret({ quoteId: 'q-3', executionIndex: 0, secret });
+
+    expect(client.orderDiscloseHtlcSecret).toHaveBeenCalledWith({ quoteId: 'q-3', executionIndex: 0, secret });
   });
 });

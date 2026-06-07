@@ -1,20 +1,25 @@
-import { isSwapQuote } from '@ston-fi/omniston-sdk';
+import { isOrderQuote, isSwapQuote } from '@ston-fi/omniston-sdk';
+import { buildAssetId } from './assets.js';
 import { getClient } from './client.js';
-import type { OmnistonQuote, QuoteParams } from './types.js';
+import type { OmnistonQuote, QuoteParams, SettlementPreference } from './types.js';
 
-function buildAssetId(asset: string | 'native') {
-  if (asset === 'native') {
-    return { chain: { $case: 'ton' as const, value: { kind: { $case: 'native' as const, value: {} } } } };
-  }
-  return { chain: { $case: 'ton' as const, value: { kind: { $case: 'jetton' as const, value: asset } } } };
+const DEFAULT_SETTLEMENT: SettlementPreference[] = [{ method: 'swap' }];
+
+function buildSettlementParams(prefs: SettlementPreference[]) {
+  return prefs.map((pref) =>
+    pref.method === 'swap'
+      ? { params: { $case: 'swap' as const, value: { maxPriceSlippagePips: pref.maxSlippagePips } } }
+      : { params: { $case: 'order' as const, value: {} } },
+  );
 }
 
 export async function getQuote(params: QuoteParams): Promise<OmnistonQuote> {
   const {
     inputAsset,
     outputAsset,
-    inputAmountNano,
-    maxSlippagePips = 50,
+    inputAmountUnits,
+    traderAddress,
+    settlement = DEFAULT_SETTLEMENT,
     timeoutMs = 15_000,
   } = params;
 
@@ -41,25 +46,36 @@ export async function getQuote(params: QuoteParams): Promise<OmnistonQuote> {
       .requestForQuote({
         inputAsset: buildAssetId(inputAsset),
         outputAsset: buildAssetId(outputAsset),
-        amount: { $case: 'inputUnits', value: inputAmountNano },
-        settlementParams: [
-          { params: { $case: 'swap', value: { maxPriceSlippagePips: maxSlippagePips } } },
-        ],
+        amount: { $case: 'inputUnits', value: inputAmountUnits },
+        settlementParams: buildSettlementParams(settlement),
       })
       .subscribe({
         next(event) {
-          if (event.$case === 'quoteUpdated' && isSwapQuote(event.value)) {
-            const q = event.value;
-            done(() =>
-              resolve({
-                rfqId: event.rfqId,
-                quoteId: q.quoteId,
-                resolverName: q.resolverName,
-                inputUnits: q.inputUnits,
-                outputUnits: q.outputUnits,
-                raw: q,
-              }),
-            );
+          switch (event.$case) {
+            case 'noQuote':
+              done(() => reject(new Error('Omniston has no route for this asset pair right now')));
+              break;
+            case 'quoteUpdated': {
+              const q = event.value;
+              if (!isSwapQuote(q) && !isOrderQuote(q)) break;
+              done(() =>
+                resolve({
+                  rfqId: event.rfqId,
+                  quoteId: q.quoteId,
+                  resolverName: q.resolverName,
+                  inputAsset,
+                  outputAsset,
+                  inputUnits: q.inputUnits,
+                  outputUnits: q.outputUnits,
+                  settlementMethod: isSwapQuote(q) ? 'swap' : 'order',
+                  traderAddress,
+                  raw: q,
+                }),
+              );
+              break;
+            }
+            // 'ack' just confirms the RFQ was received; keep waiting for a quote.
+            // 'unsubscribed' is only emitted after we unsubscribe ourselves.
           }
         },
         error(err) {

@@ -130,10 +130,10 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       const inputNano = String(Math.round(idleAmountUsdt * 1_000_000));
       const USDT_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
       omnistonQuote = await omnistonGetQuote({
-        inputAsset: USDT_ADDRESS,
-        outputAsset: 'native',
-        inputAmountNano: inputNano,
-        traderAddress: walletAddress,
+        inputAsset: { chain: 'ton', kind: 'jetton', address: USDT_ADDRESS },
+        outputAsset: { chain: 'ton', kind: 'native' },
+        inputAmountUnits: inputNano,
+        traderAddress: { chain: 'ton', address: walletAddress },
         timeoutMs: 8_000,
       });
     } catch {
