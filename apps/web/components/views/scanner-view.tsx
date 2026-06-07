@@ -119,6 +119,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
                 (pools ?? [])
                   .filter((p) => p.isCrosschain)
                   .map((p) => p.assetPair.split('-').at(-1))
+                  .filter((chain): chain is string => chain !== undefined)
               ))
                 .sort()
                 .map((chain) => (
