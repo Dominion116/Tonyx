@@ -1,4 +1,5 @@
 import { ExternalLink } from 'lucide-react';
+import type { RunStatus, RunSummary } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,85 +10,147 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getServerWalletAddress, serverApi } from '@/lib/server-api';
 
-type Status = 'Completed' | 'Skipped' | 'Failed';
-
-const runs: {
-  time: string;
-  from: string;
-  to: string;
-  amount: string;
-  yield: string;
-  fee: string;
-  status: Status;
-  tx?: string;
-}[] = [
-  { time: 'Jun 6, 14:02', from: 'TON / STON', to: 'TON / USDT', amount: '$2,500', yield: '+$18.40', fee: '$0.50', status: 'Completed', tx: 'EQAbc...9f2' },
-  { time: 'Jun 6, 08:31', from: 'Idle USDT', to: 'USDT / NOT', amount: '$3,940', yield: '+$31.10', fee: '$0.50', status: 'Completed', tx: 'EQDxy...7c1' },
-  { time: 'Jun 5, 21:19', from: 'TON / USDT', to: 'USDT / USDe', amount: '$1,200', yield: '+$0.00', fee: '$0.00', status: 'Skipped' },
-  { time: 'Jun 5, 11:48', from: 'Idle USDT', to: 'TON / jUSDT', amount: '$800', yield: '+$0.00', fee: '$0.50', status: 'Failed' },
-];
-
-const statusVariant: Record<Status, 'success' | 'warning' | 'error'> = {
-  Completed: 'success',
-  Skipped: 'warning',
-  Failed: 'error',
+const statusVariant: Record<RunStatus, 'success' | 'warning' | 'error' | 'accent'> = {
+  completed: 'success',
+  skipped: 'warning',
+  failed: 'error',
+  executing: 'accent',
+  pending: 'accent',
 };
 
-export default function HistoryPage() {
+const statusLabel: Record<RunStatus, string> = {
+  completed: 'Completed',
+  skipped: 'Skipped',
+  failed: 'Failed',
+  executing: 'Executing',
+  pending: 'Pending',
+};
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function fmtUsd(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function truncateTx(hash: string): string {
+  return hash.length > 12 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash;
+}
+
+function RunRow({ run }: { run: RunSummary }) {
+  return (
+    <TableRow>
+      <TableCell className="text-muted-foreground">{fmtTime(run.createdAt)}</TableCell>
+      <TableCell>{run.originPool}</TableCell>
+      <TableCell className="text-white">{run.destinationPool}</TableCell>
+      <TableCell>{fmtUsd(run.routedAmountUsdt)}</TableCell>
+      <TableCell className="text-emerald-400">+{fmtUsd(run.yieldEarnedUsdt)}</TableCell>
+      <TableCell>{fmtUsd(run.x402FeeUsdt)}</TableCell>
+      <TableCell>
+        <Badge variant={statusVariant[run.status]}>{statusLabel[run.status]}</Badge>
+      </TableCell>
+      <TableCell className="text-right">
+        {run.txHash ? (
+          <a
+            href={`https://tonviewer.com/transaction/${run.txHash}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-accent hover:underline"
+          >
+            {truncateTx(run.txHash)}
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        ) : (
+          <span className="text-muted-foreground">n/a</span>
+        )}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+export default async function HistoryPage() {
+  const address = await getServerWalletAddress();
+  const data = address ? await serverApi.getRuns(address) : null;
+  const runs = data?.runs ?? [];
+
+  const completed = runs.filter((r) => r.status !== 'skipped');
+  const skipped = runs.filter((r) => r.status === 'skipped');
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Run history</CardTitle>
-          <Badge variant="accent">{runs.length} runs</Badge>
+          <Badge variant="accent">{completed.length} runs</Badge>
         </CardHeader>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>From</TableHead>
-              <TableHead>To</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Yield</TableHead>
-              <TableHead>Fee</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Tx</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {runs.map((run, i) => (
-              <TableRow key={i}>
-                <TableCell className="text-muted-foreground">{run.time}</TableCell>
-                <TableCell>{run.from}</TableCell>
-                <TableCell className="text-white">{run.to}</TableCell>
-                <TableCell>{run.amount}</TableCell>
-                <TableCell className="text-emerald-400">{run.yield}</TableCell>
-                <TableCell>{run.fee}</TableCell>
-                <TableCell>
-                  <Badge variant={statusVariant[run.status]}>{run.status}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  {run.tx ? (
-                    <a
-                      href={`https://tonviewer.com/transaction/${run.tx}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-accent hover:underline"
-                    >
-                      {run.tx}
-                      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                    </a>
-                  ) : (
-                    <span className="text-muted-foreground">n/a</span>
-                  )}
-                </TableCell>
+        {completed.length === 0 ? (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">
+            No runs yet. Approve a rebalance to see it here.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Yield</TableHead>
+                <TableHead>Fee</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Tx</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {completed.map((run) => (
+                <RunRow key={run.id} run={run} />
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
+
+      {skipped.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Skipped</CardTitle>
+            <Badge variant="warning">{skipped.length}</Badge>
+          </CardHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Time</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>To</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {skipped.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell className="text-muted-foreground">{fmtTime(run.createdAt)}</TableCell>
+                  <TableCell>{run.originPool}</TableCell>
+                  <TableCell className="text-white">{run.destinationPool}</TableCell>
+                  <TableCell>{fmtUsd(run.routedAmountUsdt)}</TableCell>
+                  <TableCell>
+                    <Badge variant="warning">Dismissed</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useTonAddress } from '@tonconnect/ui-react';
 import { ArrowRight, Check, Loader2, XCircle } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { ExplanationCard } from '@/components/ui/explanation-card';
 import { ProposalCard, type Proposal } from '@/components/ui/proposal-card';
 import { useToast } from '@/components/ui/toast';
+import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export interface PoolTarget {
@@ -15,47 +17,16 @@ export interface PoolTarget {
   netGain: string;
 }
 
-type QuoteResult =
-  | { proceed: true; proposal: Proposal; approvalToken: string }
-  | { proceed: false; reason: string };
-
 type Status =
   | 'quoting'
   | 'explanation'
+  | 'error'
   | 'proposed'
   | 'signing'
   | 'payment'
   | 'executing'
   | 'completed'
   | 'failed';
-
-function buildQuote(pool: PoolTarget): QuoteResult {
-  const apr = parseFloat(pool.apr) || 0;
-  const netNum = parseFloat(pool.netGain.replace(/[^0-9.]/g, '')) || 0;
-
-  // Mock policy gate: thin edges do not clear the minimum net gain.
-  if (apr < 12) {
-    return {
-      proceed: false,
-      reason: `Moving into ${pool.pair} only nets ${pool.netGain} per week, which falls below your $5 minimum once the x402 fee and slippage are counted. I will keep watching and surface it when the edge is bigger.`,
-    };
-  }
-
-  return {
-    proceed: true,
-    approvalToken: `tok_${Math.random().toString(36).slice(2, 10)}`,
-    proposal: {
-      origin: 'Idle USDT',
-      destination: pool.pair,
-      estimatedYield: `+$${(netNum + 0.5).toFixed(2)}/wk`,
-      x402Fee: '$0.50',
-      netGain: `+$${netNum.toFixed(2)}/wk`,
-      confidence: Math.min(0.6 + (apr - 10) / 35, 0.97),
-      explanation:
-        'Net gain clears your $5 minimum after swap fees and slippage, and the move stays within your eligible assets and spending floor.',
-    },
-  };
-}
 
 const steps = ['Wallet signature', 'x402 payment', 'Execution'] as const;
 
@@ -69,66 +40,150 @@ function stepState(status: Status, index: number): 'done' | 'active' | 'pending'
   return 'pending';
 }
 
+function fmtSigned(n: number): string {
+  return `${n >= 0 ? '+' : ''}$${n.toFixed(2)}`;
+}
+
 export function QuoteModal({
   open,
   onClose,
   pool,
+  idleUsdt,
 }: {
   open: boolean;
   onClose: () => void;
   pool: PoolTarget;
+  idleUsdt: number;
 }) {
   const { toast } = useToast();
+  const walletAddress = useTonAddress();
   const [status, setStatus] = useState<Status>('quoting');
-  const [quote, setQuote] = useState<QuoteResult | null>(null);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
+  const [approvalToken, setApprovalToken] = useState<string | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [explanation, setExplanation] = useState('');
+  const [paymentNotice, setPaymentNotice] = useState('');
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimers = () => {
     timers.current.forEach((t) => clearTimeout(t));
     timers.current = [];
+    if (pollTimer.current) {
+      clearInterval(pollTimer.current);
+      pollTimer.current = null;
+    }
   };
 
   const after = (ms: number, fn: () => void) => {
     timers.current.push(setTimeout(fn, ms));
   };
 
-  // Run the quote each time the modal opens; reset on close.
+  // Request a Mira-evaluated quote each time the modal opens; reset on close.
   useEffect(() => {
     if (!open) {
       clearTimers();
       return;
     }
+
     setStatus('quoting');
-    setQuote(null);
-    after(900, () => {
-      const result = buildQuote(pool);
-      setQuote(result);
-      setStatus(result.proceed ? 'proposed' : 'explanation');
-    });
-    return clearTimers;
+    setProposal(null);
+    setApprovalToken(null);
+    setRunId(null);
+    setErrorMessage('');
+    setExplanation('');
+    setPaymentNotice('');
+
+    if (!walletAddress) {
+      setErrorMessage('Connect your wallet to request a quote.');
+      setStatus('error');
+      return;
+    }
+
+    let cancelled = false;
+
+    api
+      .quote({ walletAddress, idleAmountUsdt: Math.max(idleUsdt, 1) })
+      .then((data) => {
+        if (cancelled) return;
+
+        const mapped: Proposal = {
+          origin: data.originPool,
+          destination: data.destinationPool,
+          estimatedYield: `${fmtSigned(data.estimatedYieldUsdt)}/day`,
+          x402Fee: `$${data.x402FeeUsdt.toFixed(2)}`,
+          netGain: `${fmtSigned(data.netGainUsdt)}/day`,
+          confidence: data.mira.confidence,
+          explanation: data.mira.explanation,
+        };
+
+        if (data.mira.proceed && data.approvalToken) {
+          setProposal(mapped);
+          setApprovalToken(data.approvalToken);
+          setStatus('proposed');
+        } else {
+          setExplanation(data.mira.explanation);
+          setStatus('explanation');
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setErrorMessage(err instanceof ApiError ? err.message : 'Could not fetch a quote. Please try again.');
+        setStatus('error');
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimers();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const approve = () => {
-    // Wallet signature, then execute returns HTTP 402 -> prompt payment.
+    // Wallet confirmation, then the x402 payment prompt.
     setStatus('signing');
-    after(1100, () => setStatus('payment'));
+    after(900, () => setStatus('payment'));
   };
 
   const pay = () => {
+    if (!approvalToken) return;
+    setPaymentNotice('');
     setStatus('executing');
-    after(1700, () => {
-      setStatus('completed');
-      toast({
-        title: 'Rebalance complete',
-        description: `Into ${pool.pair}. Earned ${
-          quote && quote.proceed ? quote.proposal.netGain : ''
-        }, fee $0.50.`,
+
+    api
+      .execute(approvalToken, 'dev-placeholder-receipt')
+      .then((res) => {
+        setRunId(res.runId);
+        pollTimer.current = setInterval(() => {
+          api
+            .getRunStatus(res.runId)
+            .then((statusRes) => {
+              if (statusRes.status === 'completed') {
+                clearTimers();
+                setStatus('completed');
+                toast({
+                  title: 'Rebalance complete',
+                  description: `Into ${pool.pair}.${proposal ? ` Net ${proposal.netGain}, fee ${proposal.x402Fee}.` : ''}`,
+                });
+              } else if (statusRes.status === 'failed') {
+                clearTimers();
+                setStatus('failed');
+              }
+            })
+            .catch(() => {});
+        }, 4_000);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.is402) {
+          setPaymentNotice('Payment not yet confirmed. Please complete the x402 payment and try again.');
+          setStatus('payment');
+          return;
+        }
+        setStatus('failed');
       });
-    });
   };
 
-  const proposal = quote && quote.proceed ? quote.proposal : null;
   const isExecutionPhase =
     status === 'signing' ||
     status === 'payment' ||
@@ -141,11 +196,13 @@ export function QuoteModal({
       ? 'Fetching quote'
       : status === 'explanation'
         ? 'No action recommended'
-        : status === 'proposed'
-          ? 'Review proposal'
-          : status === 'completed'
-            ? 'Rebalance complete'
-            : 'Executing rebalance';
+        : status === 'error'
+          ? 'Quote unavailable'
+          : status === 'proposed'
+            ? 'Review proposal'
+            : status === 'completed'
+              ? 'Rebalance complete'
+              : 'Executing rebalance';
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
@@ -156,9 +213,18 @@ export function QuoteModal({
         </div>
       )}
 
-      {status === 'explanation' && quote && !quote.proceed && (
+      {status === 'error' && (
         <div className="space-y-4">
-          <ExplanationCard reason={quote.reason} />
+          <ExplanationCard reason={errorMessage} />
+          <Button variant="outline" size="sm" className="w-full" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+      )}
+
+      {status === 'explanation' && (
+        <div className="space-y-4">
+          <ExplanationCard reason={explanation} />
           <Button variant="outline" size="sm" className="w-full" onClick={onClose}>
             Close
           </Button>
@@ -230,18 +296,22 @@ export function QuoteModal({
             <div className="rounded-lg border border-accent/20 bg-accent/[0.06] p-3">
               <p className="text-sm text-white">
                 An x402 micropayment of{' '}
-                <span className="font-semibold text-accent">$0.50</span> is required
-                to execute this route.
+                <span className="font-semibold text-accent">{proposal.x402Fee}</span> is
+                required to execute this route.
               </p>
+              {paymentNotice && (
+                <p className="mt-2 text-xs text-amber-400">{paymentNotice}</p>
+              )}
               <Button size="sm" className="mt-3 w-full" onClick={pay}>
-                Pay $0.50 and execute
+                Pay {proposal.x402Fee} and execute
               </Button>
             </div>
           )}
 
           {status === 'executing' && (
             <p className="text-sm text-muted-foreground">
-              Submitting the route on TON and polling for confirmation...
+              Submitting the route on TON and polling for confirmation
+              {runId ? ` (run ${runId.slice(-6)})` : ''}...
             </p>
           )}
 
@@ -249,7 +319,7 @@ export function QuoteModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-emerald-400">
                 <Check className="h-4 w-4" aria-hidden="true" />
-                Rebalanced. Earned {proposal.netGain}, fee $0.50.
+                Rebalanced into {proposal.destination}. Net {proposal.netGain}, fee {proposal.x402Fee}.
               </div>
               <Button size="sm" className="w-full" onClick={onClose}>
                 Done
@@ -267,9 +337,9 @@ export function QuoteModal({
                 size="sm"
                 variant="outline"
                 className="w-full"
-                onClick={() => setStatus('payment')}
+                onClick={onClose}
               >
-                Retry
+                Close
               </Button>
             </div>
           )}
