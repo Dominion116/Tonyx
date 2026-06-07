@@ -6,7 +6,7 @@ const schema = new Schema<Run>(
     walletAddress: { type: String, required: true, trim: true, maxlength: 128 },
     status: {
       type: String,
-      enum: ['pending', 'executing', 'completed', 'failed', 'skipped'],
+      enum: ['pending', 'executing', 'completed', 'failed', 'skipped', 'stuck'],
       required: true,
     },
     originPool: { type: String, required: true, trim: true },
@@ -17,6 +17,10 @@ const schema = new Schema<Run>(
     approvalToken: { type: String, required: true },
     createdAt: { type: Date, required: true },
     completedAt: { type: Date },
+    isCrosschain: { type: Boolean },
+    destinationChain: { type: String },
+    bridgeCostUsdt: { type: Number, min: 0 },
+    settlementType: { type: String, enum: ['swap', 'order'] },
   },
   { timestamps: false },
 );

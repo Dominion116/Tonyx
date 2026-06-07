@@ -26,7 +26,13 @@ type Status =
   | 'signing'
   | 'executing'
   | 'completed'
-  | 'failed';
+  | 'failed'
+  | 'stuck';
+
+interface CrosschainInfo {
+  destinationChain?: string;
+  bridgeCostUsdt?: number;
+}
 
 const steps = ['Wallet signature', 'Execution'] as const;
 
@@ -64,6 +70,8 @@ export function QuoteModal({
   const [runId, setRunId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [explanation, setExplanation] = useState('');
+  const [crosschain, setCrosschain] = useState<CrosschainInfo | null>(null);
+  const [settlementPhase, setSettlementPhase] = useState<string | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const pollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -94,6 +102,8 @@ export function QuoteModal({
     setRunId(null);
     setErrorMessage('');
     setExplanation('');
+    setCrosschain(null);
+    setSettlementPhase(null);
 
     if (!walletAddress) {
       setErrorMessage('Connect your wallet to request a quote.');
@@ -115,6 +125,13 @@ export function QuoteModal({
           confidence: data.mira.confidence,
           explanation: data.mira.explanation,
         };
+
+        if (data.isCrosschain) {
+          setCrosschain({
+            destinationChain: data.destinationChain,
+            bridgeCostUsdt: data.bridgeCostUsdt,
+          });
+        }
 
         if (data.mira.proceed && data.approvalToken) {
           setProposal(mapped);
@@ -166,6 +183,9 @@ export function QuoteModal({
           api
             .getRunStatus(res.runId)
             .then((statusRes) => {
+              if (statusRes.settlementPhase) {
+                setSettlementPhase(statusRes.settlementPhase);
+              }
               if (statusRes.status === 'completed') {
                 clearTimers();
                 setStatus('completed');
@@ -176,6 +196,13 @@ export function QuoteModal({
               } else if (statusRes.status === 'failed') {
                 clearTimers();
                 setStatus('failed');
+              } else if (statusRes.status === 'stuck') {
+                clearTimers();
+                setStatus('stuck');
+                toast({
+                  title: 'Settlement stuck',
+                  description: 'Funds are safe in escrow. Tonyx is monitoring for resolution.',
+                });
               }
             })
             .catch(() => {});
@@ -190,7 +217,8 @@ export function QuoteModal({
     status === 'signing' ||
     status === 'executing' ||
     status === 'completed' ||
-    status === 'failed';
+    status === 'failed' ||
+    status === 'stuck';
 
   const title =
     status === 'quoting'
@@ -203,7 +231,9 @@ export function QuoteModal({
             ? 'Review proposal'
             : status === 'completed'
               ? 'Rebalance complete'
-              : 'Executing rebalance';
+              : status === 'stuck'
+                ? 'Settlement stuck'
+                : 'Executing rebalance';
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
@@ -245,12 +275,17 @@ export function QuoteModal({
       {isExecutionPhase && proposal && (
         <div className="space-y-4">
           {/* Route summary */}
-          <div className="flex items-center gap-2 text-sm font-medium text-white">
+          <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-white">
             <span className="rounded-md bg-white/5 px-2 py-1">{proposal.origin}</span>
             <ArrowRight className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
             <span className="rounded-md bg-accent/15 px-2 py-1 text-accent">
               {proposal.destination}
             </span>
+            {crosschain && (
+              <span className="rounded-md border border-white/10 px-2 py-1 text-xs text-muted-foreground">
+                via {crosschain.destinationChain ?? 'bridge'}
+              </span>
+            )}
           </div>
 
           {/* Stepper */}
@@ -296,8 +331,20 @@ export function QuoteModal({
 
           {status === 'executing' && (
             <p className="text-sm text-muted-foreground">
-              Submitting the route on TON and polling for confirmation
-              {runId ? ` (run ${runId.slice(-6)})` : ''}...
+              {crosschain ? (
+                <>
+                  {settlementPhase ?? `Settling cross-chain to ${crosschain.destinationChain ?? 'destination'}`}
+                  {crosschain.bridgeCostUsdt !== undefined
+                    ? ` · bridge ~$${crosschain.bridgeCostUsdt.toFixed(2)}`
+                    : ''}
+                  {runId ? ` (run ${runId.slice(-6)})` : ''}...
+                </>
+              ) : (
+                <>
+                  Submitting the route on TON and polling for confirmation
+                  {runId ? ` (run ${runId.slice(-6)})` : ''}...
+                </>
+              )}
             </p>
           )}
 
@@ -318,6 +365,27 @@ export function QuoteModal({
               <div className="flex items-center gap-2 text-sm text-red-400">
                 <XCircle className="h-4 w-4" aria-hidden="true" />
                 Execution failed.
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full"
+                onClick={onClose}
+              >
+                Close
+              </Button>
+            </div>
+          )}
+
+          {status === 'stuck' && (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 text-sm text-amber-400">
+                <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>
+                  Cross-chain settlement to {crosschain?.destinationChain ?? 'the destination chain'} is
+                  taking longer than expected. Your funds are safe in escrow — Tonyx is monitoring and
+                  will resolve or refund the order automatically.
+                </span>
               </div>
               <Button
                 size="sm"

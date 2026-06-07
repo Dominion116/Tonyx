@@ -19,6 +19,7 @@ const statusVariant: Record<RunStatus, 'success' | 'warning' | 'error' | 'accent
   failed: 'error',
   executing: 'accent',
   pending: 'accent',
+  stuck: 'warning',
 };
 
 const statusLabel: Record<RunStatus, string> = {
@@ -27,6 +28,7 @@ const statusLabel: Record<RunStatus, string> = {
   failed: 'Failed',
   executing: 'Executing',
   pending: 'Pending',
+  stuck: 'Stuck',
 };
 
 function fmtTime(iso: string): string {
@@ -51,7 +53,21 @@ function RunRow({ run }: { run: RunSummary }) {
     <TableRow>
       <TableCell className="text-muted-foreground">{fmtTime(run.createdAt)}</TableCell>
       <TableCell>{run.originPool}</TableCell>
-      <TableCell className="text-white">{run.destinationPool}</TableCell>
+      <TableCell className="text-white">
+        <div className="flex flex-col gap-1">
+          <span>{run.destinationPool}</span>
+          {run.isCrosschain && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Badge variant="outline" className="text-[10px]">
+                {run.destinationChain ?? 'crosschain'}
+              </Badge>
+              {run.bridgeCostUsdt !== undefined && (
+                <span>bridge {fmtUsd(run.bridgeCostUsdt)}</span>
+              )}
+            </span>
+          )}
+        </div>
+      </TableCell>
       <TableCell>{fmtUsd(run.routedAmountUsdt)}</TableCell>
       <TableCell className="text-emerald-400">+{fmtUsd(run.yieldEarnedUsdt)}</TableCell>
       <TableCell>

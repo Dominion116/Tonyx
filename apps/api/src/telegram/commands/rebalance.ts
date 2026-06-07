@@ -61,6 +61,12 @@ export async function handleRebalance(ctx: Context): Promise<void> {
     const idleAmount = Math.max(balance.idleUsdt - policy.spendingFloorUsdt, 0);
     const dailyYield = (idleAmount * topPool.aprPercent) / 100 / 365;
 
+    const isCrosschain = topPool.isCrosschain === true;
+    const destinationChain = isCrosschain
+      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      : undefined;
+    const bridgeCostUsdt = topPool.estimatedBridgeCostUsdt;
+
     const rec = evaluateRebalance({
       originPool: 'idle USDT',
       destinationPool: topPool.name,
@@ -68,10 +74,8 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       routedAmountUsdt: idleAmount,
       estimatedYieldUsdt: dailyYield,
       minNetGainUsdt: policy.minNetGainUsdt,
-      estimatedBridgeCostUsdt: topPool.estimatedBridgeCostUsdt,
-      destinationChain: topPool.isCrosschain
-        ? (topPool.assetPair.split('-')[1] ?? 'destination')
-        : undefined,
+      estimatedBridgeCostUsdt: bridgeCostUsdt,
+      destinationChain,
     });
 
     if (!rec.proceed) {
@@ -92,14 +96,24 @@ export async function handleRebalance(ctx: Context): Promise<void> {
       routedAmountUsdt: idleAmount,
       estimatedYieldUsdt: dailyYield,
       expiresAt: Date.now() + 10 * 60 * 1_000,
+      isCrosschain,
+      destinationChain,
+      bridgeCostUsdt,
+      settlementType: isCrosschain ? 'order' : 'swap',
     });
+
+    const crosschainLine = isCrosschain
+      ? `\n*Bridge:* cross-chain to ${destinationChain}` +
+        (bridgeCostUsdt !== undefined ? ` (~$${bridgeCostUsdt.toFixed(2)} cost)` : '')
+      : '';
 
     const msg =
       `💡 *Tonyx Proposal* (confidence: ${(rec.confidence * 100).toFixed(0)}%)\n\n` +
       `${rec.explanation}\n\n` +
       `*Route:* idle USDT → ${topPool.name}\n` +
       `*Amount:* $${idleAmount.toFixed(2)}\n` +
-      `*Est. yield:* $${dailyYield.toFixed(4)}`;
+      `*Est. yield:* $${dailyYield.toFixed(4)}` +
+      crosschainLine;
 
     const askMiraUrl = buildAskMiraDeepLink({
       originPool: 'idle USDT',

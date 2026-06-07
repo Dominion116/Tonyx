@@ -14,17 +14,21 @@ export async function handleStatus(ctx: Context): Promise<void> {
       return;
     }
 
-    const [balance, policy, lastRun] = await Promise.allSettled([
+    const [balance, policy, lastRun, stuckRun] = await Promise.allSettled([
       fetchBalance(user.walletAddress),
       PolicyModel.findOne({ walletAddress: user.walletAddress }).sort({ version: -1 }).lean(),
       RunModel.findOne({ walletAddress: user.walletAddress, status: 'completed' })
         .sort({ completedAt: -1 })
+        .lean(),
+      RunModel.findOne({ walletAddress: user.walletAddress, status: 'stuck' })
+        .sort({ createdAt: -1 })
         .lean(),
     ]);
 
     const bal = balance.status === 'fulfilled' ? balance.value : null;
     const pol = policy.status === 'fulfilled' ? policy.value : null;
     const run = lastRun.status === 'fulfilled' ? lastRun.value : null;
+    const stuck = stuckRun.status === 'fulfilled' ? stuckRun.value : null;
 
     const lines: string[] = [
       `*Tonyx Status* for \`${user.walletAddress.slice(0, 8)}…\`\n`,
@@ -41,6 +45,14 @@ export async function handleStatus(ctx: Context): Promise<void> {
         ? `✅ *Last run:* earned $${run.yieldEarnedUsdt.toFixed(4)}`
         : '📭 No completed runs yet',
     ];
+
+    if (stuck) {
+      lines.push(
+        '',
+        `⚠️ *Stuck settlement:* a cross-chain order to ${stuck.destinationChain ?? 'a destination chain'} ` +
+          `is awaiting resolution. Funds are safe in escrow.`,
+      );
+    }
 
     await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
   } catch {

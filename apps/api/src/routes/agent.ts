@@ -17,7 +17,7 @@ import { validate } from '../middleware/validate.js';
 import { getPoolsFromCache } from '../cron/poolScanner.js';
 import { evaluateRebalance } from '../services/advisor.js';
 import { savePendingQuote, consumePendingQuote } from '../services/pendingQuotes.js';
-import { trackExecution } from '../services/execution.js';
+import { trackExecution, trackCrosschainExecution, getSettlementPhase } from '../services/execution.js';
 
 const router = Router();
 
@@ -109,6 +109,14 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
     const topPool = eligible[0];
     const secondPool = eligible[1] ?? topPool;
 
+    // ── Cross-chain route metadata ───────────────────────────────────────────
+    const isCrosschain = topPool.isCrosschain === true;
+    const destinationChain = isCrosschain
+      ? (topPool.assetPair.split('-')[1] ?? 'destination')
+      : undefined;
+    const bridgeCostUsdt = topPool.estimatedBridgeCostUsdt;
+    const settlementType: 'swap' | 'order' = isCrosschain ? 'order' : 'swap';
+
     // ── Estimate yield ───────────────────────────────────────────────────────
     const dailyYieldPct = topPool.aprPercent / 365;
     const estimatedYieldUsdt = parseFloat(((idleAmountUsdt * dailyYieldPct) / 100).toFixed(4));
@@ -148,10 +156,8 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       minNetGainUsdt: activePolicy.minNetGainUsdt,
-      estimatedBridgeCostUsdt: topPool.estimatedBridgeCostUsdt,
-      destinationChain: topPool.isCrosschain
-        ? (topPool.assetPair.split('-')[1] ?? 'destination')
-        : undefined,
+      estimatedBridgeCostUsdt: bridgeCostUsdt,
+      destinationChain,
     });
 
     // ── Generate approval token ──────────────────────────────────────────────
@@ -165,6 +171,10 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       expiresAt: Date.now() + 10 * 60 * 1_000,
+      isCrosschain,
+      destinationChain,
+      bridgeCostUsdt,
+      settlementType,
     });
 
     const body: QuoteResponse = {
@@ -174,6 +184,9 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       mira: advisorRec,
+      isCrosschain,
+      destinationChain,
+      bridgeCostUsdt,
     };
 
     res.json(body);
@@ -232,10 +245,23 @@ router.post(
         yieldEarnedUsdt: 0,
         approvalToken,
         createdAt: now,
+        isCrosschain: pending.isCrosschain,
+        destinationChain: pending.destinationChain,
+        bridgeCostUsdt: pending.bridgeCostUsdt,
+        settlementType: pending.settlementType,
       });
 
-      // Fire-and-forget execution coroutine
-      void trackExecution(run._id, pending.walletAddress, now.getTime());
+      // Fire-and-forget execution coroutine. Cross-chain orders settle through the
+      // HTLC lifecycle tracker; same-chain swaps use the TON transaction poller.
+      if (pending.isCrosschain) {
+        void trackCrosschainExecution(run._id, {
+          quoteId: pending.omnistonQuote?.quoteId,
+          walletAddress: pending.walletAddress,
+          destinationChain: pending.destinationChain ?? 'destination',
+        });
+      } else {
+        void trackExecution(run._id, pending.walletAddress, now.getTime());
+      }
 
       const body: ExecuteResponse = {
         runId: run._id.toString(),
@@ -308,6 +334,9 @@ router.get('/runs/:address', requireAuth, async (req, res, next) => {
           txHash: r.txHash,
           createdAt: r.createdAt.toISOString(),
           completedAt: r.completedAt?.toISOString(),
+          isCrosschain: r.isCrosschain,
+          destinationChain: r.destinationChain,
+          bridgeCostUsdt: r.bridgeCostUsdt,
         }),
       ),
       nextCursor: hasMore ? runs[runs.length - 1]._id.toString() : undefined,
@@ -356,6 +385,9 @@ router.get('/runs/:id/status', requireAuth, async (req, res, next) => {
       id: run._id.toString(),
       status: run.status as RunStatusResponse['status'],
       txHash: run.txHash,
+      isCrosschain: run.isCrosschain,
+      destinationChain: run.destinationChain,
+      settlementPhase: getSettlementPhase(run._id.toString()),
     };
 
     res.json(body);

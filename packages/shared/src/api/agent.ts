@@ -15,6 +15,10 @@ export const QuoteResponseSchema = z.object({
   routedAmountUsdt: z.number(),
   estimatedYieldUsdt: z.number(),
   mira: MiraRecommendationSchema,
+  // ── Cross-chain route details (omitted for same-chain TON swaps) ─────────────
+  isCrosschain: z.boolean().optional(),
+  destinationChain: z.string().optional(),
+  bridgeCostUsdt: z.number().nonnegative().optional(),
 });
 export type QuoteResponse = z.infer<typeof QuoteResponseSchema>;
 
@@ -39,6 +43,9 @@ export const RunSummarySchema = z.object({
   txHash: z.string().optional(),
   createdAt: z.string().datetime(),
   completedAt: z.string().datetime().optional(),
+  isCrosschain: z.boolean().optional(),
+  destinationChain: z.string().optional(),
+  bridgeCostUsdt: z.number().nonnegative().optional(),
 });
 export type RunSummary = z.infer<typeof RunSummarySchema>;
 
@@ -53,5 +60,9 @@ export const RunStatusResponseSchema = z.object({
   id: z.string(),
   status: RunStatusSchema,
   txHash: z.string().optional(),
+  isCrosschain: z.boolean().optional(),
+  destinationChain: z.string().optional(),
+  /** Human-readable settlement phase for cross-chain orders (e.g. 'Escrow locked'). */
+  settlementPhase: z.string().optional(),
 });
 export type RunStatusResponse = z.infer<typeof RunStatusResponseSchema>;

@@ -10,6 +10,12 @@ export interface PendingQuote {
   routedAmountUsdt: number;
   estimatedYieldUsdt: number;
   expiresAt: number;
+  // ── Cross-chain settlement metadata (absent on same-chain TON swaps) ──────────
+  isCrosschain?: boolean;
+  destinationChain?: string;
+  bridgeCostUsdt?: number;
+  /** 'swap' = same-chain/TON; 'order' = cross-chain HTLC escrow. */
+  settlementType?: 'swap' | 'order';
 }
 
 const store = new Map<string, PendingQuote>();
