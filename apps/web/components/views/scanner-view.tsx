@@ -1,3 +1,6 @@
+'use client';
+
+import { useMemo, useState } from 'react';
 import type { Pool } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +17,14 @@ import {
 } from '@/components/ui/table';
 
 const PAGE_SIZE = 10;
+
+/** Maps canonical chain names to display symbols. */
+const CHAIN_SYMBOLS: Record<string, string> = {
+  ethereum: 'ETH',
+  base: 'BASE',
+  bsc: 'BSC',
+  polygon: 'POLY',
+};
 
 function fmtLiquidity(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -40,14 +51,44 @@ interface Props {
 
 /** Yield scanner table, shared by the web dashboard and the Mini App. */
 export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath }: Props) {
-  const filtered = (pools ?? [])
-    .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent > 0 && p.aprPercent < 500_000)
-    .sort((a, b) => b.aprPercent - a.aprPercent);
+  const [selectedChain, setSelectedChain] = useState<string | 'all'>('all');
+
+  const filtered = useMemo(() => {
+    const base = (pools ?? [])
+      .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent > 0 && p.aprPercent < 500_000)
+      .sort((a, b) => b.aprPercent - a.aprPercent);
+
+    if (selectedChain === 'all') return base;
+
+    // Filter to the selected chain: TON for native pools, or by exact chain match for cross-chain.
+    return base.filter((p) => {
+      if (selectedChain === 'ton') return !p.isCrosschain;
+      if (p.isCrosschain) {
+        const chain = p.assetPair.split('-').at(-1);
+        return chain === selectedChain;
+      }
+      return false;
+    });
+  }, [pools, selectedChain]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const poolList = filtered.slice(start, start + PAGE_SIZE);
+
+  // Collect unique chains present in pools for the filter dropdown.
+  const availableChains = useMemo(() => {
+    const chains = new Set<string>();
+    (pools ?? []).forEach((p) => {
+      if (p.isCrosschain) {
+        const chain = p.assetPair.split('-').at(-1);
+        if (chain) chains.add(chain);
+      } else {
+        chains.add('ton');
+      }
+    });
+    return ['all', 'ton', ...Array.from(chains).sort()];
+  }, [pools]);
 
   const hrefForPage = (n: number) => (n <= 1 ? basePath : `${basePath}?page=${n}`);
   const prevHref = currentPage > 1 ? hrefForPage(currentPage - 1) : undefined;
@@ -60,9 +101,33 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Yield scanner</CardTitle>
-          <Badge variant="accent">{ageLabel}</Badge>
+        <CardHeader className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle>Yield scanner</CardTitle>
+            <Badge variant="accent">{ageLabel}</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground">Filter by chain:</label>
+            <select
+              value={selectedChain}
+              onChange={(e) => setSelectedChain(e.target.value)}
+              className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm text-white transition-colors hover:border-white/20 hover:bg-white/10"
+            >
+              <option value="all">All chains</option>
+              <option value="ton">TON native</option>
+              {Array.from(new Set(
+                (pools ?? [])
+                  .filter((p) => p.isCrosschain)
+                  .map((p) => p.assetPair.split('-').at(-1))
+              ))
+                .sort()
+                .map((chain) => (
+                  <option key={chain} value={chain}>
+                    {CHAIN_SYMBOLS[chain] || chain}
+                  </option>
+                ))}
+            </select>
+          </div>
         </CardHeader>
         <p className="mb-4 text-sm text-muted-foreground">
           Ranked by real net gain on your idle balance after swap fees, gas, and slippage.
@@ -90,9 +155,15 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-white">{pool.name}</span>
                       {pool.isCrosschain && (
-                        <Badge variant="outline" className="text-[10px]">
-                          Crosschain
-                        </Badge>
+                        <>
+                          <Badge variant="outline" className="text-[10px]">
+                            Crosschain
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {CHAIN_SYMBOLS[pool.assetPair.split('-').at(-1) ?? ''] ||
+                              pool.assetPair.split('-').at(-1)}
+                          </Badge>
+                        </>
                       )}
                     </div>
                   </TableCell>
