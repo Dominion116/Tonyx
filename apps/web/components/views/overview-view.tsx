@@ -1,4 +1,5 @@
 import { Coins, Wallet, TrendingUp, Receipt } from 'lucide-react';
+import type { BalanceResponse } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '@/components/ui/stat-card';
 import { Badge } from '@/components/ui/badge';
@@ -11,21 +12,29 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const metrics = [
-  { label: 'Idle balance', value: '$4,820.00', icon: Wallet, change: '+2.4%', trend: 'up' as const },
-  { label: 'Deployed balance', value: '$12,640.00', icon: Coins, change: '+5.1%', trend: 'up' as const },
-  { label: 'Lifetime yield', value: '$1,284.52', icon: TrendingUp, change: '+11.0%', trend: 'up' as const },
-  { label: 'x402 fees paid', value: '$38.17', icon: Receipt },
-];
+function fmt(n: number) {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-const positions = [
-  { pool: 'TON / USDT', deposited: '$6,200.00', apr: '14.2%', status: 'Active' as const },
-  { pool: 'USDT / NOT', deposited: '$3,940.00', apr: '11.8%', status: 'Active' as const },
-  { pool: 'TON / STON', deposited: '$2,500.00', apr: '9.4%', status: 'Active' as const },
-];
+interface Props {
+  balance?: BalanceResponse | null;
+}
 
 /** Portfolio overview, shared by the web dashboard and the Mini App home. */
-export function OverviewView() {
+export function OverviewView({ balance }: Props) {
+  const idle = balance?.idleUsdt ?? 0;
+  const deployed = balance?.deployedUsdt ?? 0;
+  const lifetimeYield = balance?.lifetimeYieldUsdt ?? 0;
+  const lifetimeFees = balance?.lifetimeFeesUsdt ?? 0;
+  const positions = balance?.lpPositions ?? [];
+
+  const metrics = [
+    { label: 'Idle balance', value: fmt(idle), icon: Wallet },
+    { label: 'Deployed balance', value: fmt(deployed), icon: Coins },
+    { label: 'Lifetime yield', value: fmt(lifetimeYield), icon: TrendingUp },
+    { label: 'x402 fees paid', value: fmt(lifetimeFees), icon: Receipt },
+  ];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -37,31 +46,39 @@ export function OverviewView() {
       <Card>
         <CardHeader>
           <CardTitle>Active positions</CardTitle>
-          <Badge variant="accent">{positions.length} pools</Badge>
+          {positions.length > 0 && (
+            <Badge variant="accent">{positions.length} pools</Badge>
+          )}
         </CardHeader>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Pool</TableHead>
-              <TableHead>Deposited</TableHead>
-              <TableHead>Current APR</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {positions.map((p) => (
-              <TableRow key={p.pool}>
-                <TableCell className="font-medium text-white">{p.pool}</TableCell>
-                <TableCell>{p.deposited}</TableCell>
-                <TableCell className="text-accent">{p.apr}</TableCell>
-                <TableCell>
-                  <Badge variant="success">{p.status}</Badge>
-                </TableCell>
+        {positions.length === 0 ? (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">
+            No active positions. Connect your wallet and run a rebalance to get started.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pool</TableHead>
+                <TableHead>Deposited</TableHead>
+                <TableHead>Current APR</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {positions.map((p) => (
+                <TableRow key={p.poolId}>
+                  <TableCell className="font-medium text-white">{p.poolName}</TableCell>
+                  <TableCell>{fmt(p.depositedUsdt)}</TableCell>
+                  <TableCell className="text-accent">{p.currentAprPercent.toFixed(1)}%</TableCell>
+                  <TableCell>
+                    <Badge variant="success">Active</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { ChevronDown, LogOut, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { setToken, clearToken } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 const truncate = (a: string) => `${a.slice(0, 4)}...${a.slice(-4)}`;
@@ -22,13 +23,19 @@ export function WalletButton({ className }: { className?: string }) {
 
   useEffect(() => {
     if (address && address !== prevAddress.current) {
-      // New or restored connection: establish the server session.
+      // New or restored connection: establish the server session and store JWT.
       fetch('/api/wallet/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address }),
-      }).catch(() => {});
+      })
+        .then((r) => r.json())
+        .then((data: { sessionToken?: string }) => {
+          if (data.sessionToken) setToken(data.sessionToken);
+        })
+        .catch(() => {});
     } else if (!address && prevAddress.current) {
+      clearToken();
       fetch('/api/wallet/disconnect', { method: 'POST' }).catch(() => {});
     }
     prevAddress.current = address;

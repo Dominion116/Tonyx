@@ -1,3 +1,4 @@
+import type { Pool } from '@tonyx/shared';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { RebalanceButton } from '@/components/quote/rebalance-button';
@@ -10,63 +11,91 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const pools = [
-  { pair: 'TON / USDT', apr: '18.4%', liquidity: '$4.2M', netGain: '+$62.40', crosschain: false },
-  { pair: 'USDT / USDe', apr: '16.1%', liquidity: '$2.8M', netGain: '+$48.10', crosschain: true },
-  { pair: 'TON / NOT', apr: '14.7%', liquidity: '$1.9M', netGain: '+$39.85', crosschain: false },
-  { pair: 'STON / USDT', apr: '12.3%', liquidity: '$1.1M', netGain: '+$24.60', crosschain: false },
-  { pair: 'TON / jUSDT', apr: '10.9%', liquidity: '$880K', netGain: '+$18.20', crosschain: true },
-];
+function fmtLiquidity(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function estimateNetGain(pool: Pool, idleUsdt: number, x402Fee = 0.1): string {
+  const dailyYield = (idleUsdt * pool.aprPercent) / 100 / 365;
+  const net = dailyYield - x402Fee - (pool.estimatedBridgeCostUsdt ?? 0);
+  const sign = net >= 0 ? '+' : '';
+  return `${sign}$${net.toFixed(2)}/day`;
+}
+
+interface Props {
+  pools?: Pool[] | null;
+  cachedAt?: string | null;
+  idleUsdt?: number;
+}
 
 /** Yield scanner table, shared by the web dashboard and the Mini App. */
-export function ScannerView() {
+export function ScannerView({ pools, cachedAt, idleUsdt = 0 }: Props) {
+  const poolList = (pools ?? [])
+    .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent > 0 && p.aprPercent < 500_000)
+    .sort((a, b) => b.aprPercent - a.aprPercent)
+    .slice(0, 20);
+
+  const ageLabel = cachedAt
+    ? `Updated ${Math.round((Date.now() - new Date(cachedAt).getTime()) / 1000)}s ago`
+    : 'Fetching pools...';
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Yield scanner</CardTitle>
-          <Badge variant="accent">Updated 12s ago</Badge>
+          <Badge variant="accent">{ageLabel}</Badge>
         </CardHeader>
         <p className="mb-4 text-sm text-muted-foreground">
-          Ranked by real net gain on your idle balance after swap fees, gas, and
-          slippage.
+          Ranked by real net gain on your idle balance after swap fees, gas, and slippage.
         </p>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Pool</TableHead>
-              <TableHead>APR</TableHead>
-              <TableHead>Liquidity</TableHead>
-              <TableHead>Est. net gain</TableHead>
-              <TableHead className="text-right">Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {pools.map((pool) => (
-              <TableRow key={pool.pair}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-white">{pool.pair}</span>
-                    {pool.crosschain && (
-                      <Badge variant="outline" className="text-[10px]">
-                        Crosschain
-                      </Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell className="text-accent">{pool.apr}</TableCell>
-                <TableCell>{pool.liquidity}</TableCell>
-                <TableCell className="text-emerald-400">{pool.netGain}</TableCell>
-                <TableCell className="text-right">
-                  <RebalanceButton
-                    pool={{ pair: pool.pair, apr: pool.apr, netGain: pool.netGain }}
-                  />
-                </TableCell>
+        {poolList.length === 0 ? (
+          <p className="px-4 pb-4 text-sm text-muted-foreground">
+            No pools loaded yet. The scanner refreshes every 60 s.
+          </p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pool</TableHead>
+                <TableHead>APR</TableHead>
+                <TableHead>Liquidity</TableHead>
+                <TableHead>Est. net gain/day</TableHead>
+                <TableHead className="text-right">Action</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {poolList.map((pool) => (
+                <TableRow key={pool.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-white">{pool.name}</span>
+                      {pool.isCrosschain && (
+                        <Badge variant="outline" className="text-[10px]">
+                          Crosschain
+                        </Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-accent">{pool.aprPercent.toFixed(1)}%</TableCell>
+                  <TableCell>{fmtLiquidity(pool.liquidityUsdt)}</TableCell>
+                  <TableCell className="text-emerald-400">
+                    {estimateNetGain(pool, idleUsdt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <RebalanceButton
+                      pool={{ pair: pool.assetPair, apr: `${pool.aprPercent.toFixed(1)}%`, netGain: estimateNetGain(pool, idleUsdt) }}
+                      idleUsdt={idleUsdt}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </Card>
     </div>
   );
