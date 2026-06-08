@@ -2,14 +2,15 @@ import { Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Rendered when Mira returns proceed:false. Shows the plain-language reason and
- * deliberately offers no Approve action.
+ * Shared quote-status card for either a Mira refusal or a non-advisory error.
  */
 export function ExplanationCard({
   reason,
+  title = 'Mira recommends holding',
   className,
 }: {
   reason: string;
+  title?: string;
   className?: string;
 }) {
   return (
@@ -23,7 +24,7 @@ export function ExplanationCard({
         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-white/70">
           <Info className="h-4 w-4" aria-hidden="true" />
         </span>
-        <p className="text-sm font-semibold text-white">Mira recommends holding</p>
+        <p className="text-sm font-semibold text-white">{title}</p>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{reason}</p>
     </div>

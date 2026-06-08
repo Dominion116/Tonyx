@@ -249,7 +249,7 @@ export function QuoteModal({
 
       {status === 'error' && (
         <div className="space-y-4">
-          <ExplanationCard reason={errorMessage} />
+          <ExplanationCard title="Quote unavailable" reason={errorMessage} />
           <Button variant="outline" size="sm" className="w-full" onClick={onClose}>
             Close
           </Button>
