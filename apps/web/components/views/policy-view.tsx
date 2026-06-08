@@ -179,6 +179,7 @@ export function PolicyView() {
                   <input
                     type="number"
                     min={0}
+                    step={0.01}
                     value={minNetGain}
                     onChange={(e) => setMinNetGain(Number(e.target.value))}
                     className={cn(inputClass, 'pl-7')}
@@ -194,6 +195,7 @@ export function PolicyView() {
                   <input
                     type="number"
                     min={0}
+                    step={0.01}
                     value={spendingFloor}
                     onChange={(e) => setSpendingFloor(Number(e.target.value))}
                     className={cn(inputClass, 'pl-7')}
