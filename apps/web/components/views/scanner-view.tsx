@@ -172,6 +172,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
                   <TableCell className="text-right">
                     <RebalanceButton
                       pool={{
+                        id: pool.id,
                         pair: pool.assetPair,
                         apr: `${pool.aprPercent.toFixed(1)}%`,
                         netGain: fmtNetGain(pool, idleUsdt),

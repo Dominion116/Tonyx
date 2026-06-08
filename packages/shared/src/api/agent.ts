@@ -5,6 +5,7 @@ import { MiraRecommendationSchema } from '../models/mira.js';
 export const QuoteRequestSchema = z.object({
   walletAddress: z.string().min(1).max(128).trim(),
   idleAmountUsdt: z.number().positive(),
+  destinationPoolId: z.string().min(1).optional(),
 });
 export type QuoteRequest = z.infer<typeof QuoteRequestSchema>;
 

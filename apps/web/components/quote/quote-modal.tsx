@@ -13,6 +13,7 @@ import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export interface PoolTarget {
+  id: string;
   pair: string;
   apr: string;
   netGain: string;
@@ -114,7 +115,11 @@ export function QuoteModal({
     let cancelled = false;
 
     api
-      .quote({ walletAddress, idleAmountUsdt: Math.max(idleUsdt, 1) })
+      .quote({
+        walletAddress,
+        idleAmountUsdt: Math.max(idleUsdt, 1),
+        destinationPoolId: pool.id,
+      })
       .then((data) => {
         if (cancelled) return;
 

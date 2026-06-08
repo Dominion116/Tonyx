@@ -49,9 +49,10 @@ const router = Router();
  */
 router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res, next) => {
   try {
-    const { walletAddress, idleAmountUsdt } = req.body as {
+    const { walletAddress, idleAmountUsdt, destinationPoolId } = req.body as {
       walletAddress: string;
       idleAmountUsdt: number;
+      destinationPoolId?: string;
     };
 
     if (req.wallet !== walletAddress) {
@@ -90,7 +91,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       }
     }
 
-    // ── Pick best pool from cache ────────────────────────────────────────────
+    // ── Pick requested pool from cache, or fall back to best pool ────────────
     const cache = await getPoolsFromCache().catch(() => null);
     const pools = cache?.pools ?? [];
     const eligible = pools
@@ -106,19 +107,26 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       return next(ApiError.internal('No eligible pools available'));
     }
 
-    const topPool = eligible[0];
-    const secondPool = eligible[1] ?? topPool;
+    const destinationPool = destinationPoolId
+      ? eligible.find((p) => p.id === destinationPoolId)
+      : eligible[0];
+
+    if (!destinationPool) {
+      return next(ApiError.badRequest('Selected pool is no longer eligible', 'POOL_NOT_ELIGIBLE'));
+    }
+
+    const originPool = eligible.find((p) => p.id !== destinationPool.id) ?? destinationPool;
 
     // ── Cross-chain route metadata ───────────────────────────────────────────
-    const isCrosschain = topPool.isCrosschain === true;
+    const isCrosschain = destinationPool.isCrosschain === true;
     const destinationChain = isCrosschain
-      ? (topPool.assetPair.split('-').at(-1) ?? 'destination')
+      ? (destinationPool.assetPair.split('-').at(-1) ?? 'destination')
       : undefined;
-    const bridgeCostUsdt = topPool.estimatedBridgeCostUsdt;
+    const bridgeCostUsdt = destinationPool.estimatedBridgeCostUsdt;
     const settlementType: 'swap' | 'order' = isCrosschain ? 'order' : 'swap';
 
     // ── Estimate yield ───────────────────────────────────────────────────────
-    const dailyYieldPct = topPool.aprPercent / 365;
+    const dailyYieldPct = destinationPool.aprPercent / 365;
     const estimatedYieldUsdt = parseFloat(((idleAmountUsdt * dailyYieldPct) / 100).toFixed(4));
 
     // ── Policy gain eligibility ──────────────────────────────────────────────
@@ -150,9 +158,9 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
 
     // ── Advisor evaluation ───────────────────────────────────────────────────
     const advisorRec = evaluateRebalance({
-      originPool: secondPool.name,
-      destinationPool: topPool.name,
-      aprPercent: topPool.aprPercent,
+      originPool: originPool.name,
+      destinationPool: destinationPool.name,
+      aprPercent: destinationPool.aprPercent,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       minNetGainUsdt: activePolicy.minNetGainUsdt,
@@ -166,8 +174,8 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
     savePendingQuote(approvalToken, {
       walletAddress,
       omnistonQuote: omnistonQuote!,
-      originPool: secondPool.name,
-      destinationPool: topPool.name,
+      originPool: originPool.name,
+      destinationPool: destinationPool.name,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       expiresAt: Date.now() + 10 * 60 * 1_000,
@@ -179,9 +187,9 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
 
     const body: QuoteResponse = {
       approvalToken,
-      originPool: secondPool.name,
-      destinationPool: topPool.name,
-      destinationAprPercent: topPool.aprPercent,
+      originPool: originPool.name,
+      destinationPool: destinationPool.name,
+      destinationAprPercent: destinationPool.aprPercent,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       mira: advisorRec,
