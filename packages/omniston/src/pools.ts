@@ -13,8 +13,9 @@ const KNOWN_SYMBOLS: Record<string, string> = {
   'EQDmkj65Ab_m0aZaW8IpKw4kYqd5Bv5ZkE_2WDNRW7AAAAA': 'stTON',
 };
 
-// The only assets Tonyx rebalances into — USDC and USDT, on every chain.
-const SUPPORTED_STABLES = new Set(['USDC', 'USDT']);
+// Assets Tonyx rebalances into, on every chain — USDC/USDT plus TON and jUSDT for now.
+// Stored uppercase so lookups can normalise either side (KNOWN_SYMBOLS has mixed-case entries like 'jUSDT').
+const SUPPORTED_ASSETS = new Set(['USDC', 'USDT', 'TON', 'JUSDT']);
 
 // Chains we support for cross-chain settlement (canonical lowercase keys).
 const SUPPORTED_CHAINS = new Set(['ethereum', 'base', 'bsc', 'polygon']);
@@ -32,13 +33,13 @@ function symbol(address: string): string {
 }
 
 /**
- * True only if every asset in a pool symbol is a supported stable (USDC/USDT).
- * Handles single-asset lending pools ("USDC") and stable LP pairs ("USDC-USDT"),
- * while rejecting anything with a non-stable leg ("USDC-WETH", "USDT-TON").
+ * True only if every asset in a pool symbol is a supported asset (USDC/USDT/TON/jUSDT).
+ * Handles single-asset lending pools ("USDC") and pairs ("TON-USDT"),
+ * while rejecting anything with an unsupported leg ("USDC-WETH", "USDT-WBTC").
  */
-function isStableOnly(poolSymbol: string): boolean {
+function isSupportedPair(poolSymbol: string): boolean {
   const parts = poolSymbol.split('-').map((s) => s.trim().toUpperCase());
-  return parts.length > 0 && parts.every((p) => SUPPORTED_STABLES.has(p));
+  return parts.length > 0 && parts.every((p) => SUPPORTED_ASSETS.has(p));
 }
 
 interface StonPool {
@@ -79,8 +80,8 @@ export async function discoverPools(): Promise<Pool[]> {
       const sym1 = symbol(p.token1_address);
       return { p, sym0, sym1 };
     })
-    // Only USDC/USDT pools — both legs must be a supported stable.
-    .filter(({ sym0, sym1 }) => SUPPORTED_STABLES.has(sym0) && SUPPORTED_STABLES.has(sym1))
+    // Only supported-asset pools — both legs must be in SUPPORTED_ASSETS.
+    .filter(({ sym0, sym1 }) => SUPPORTED_ASSETS.has(sym0.toUpperCase()) && SUPPORTED_ASSETS.has(sym1.toUpperCase()))
     .map(({ p, sym0, sym1 }): Pool => ({
       id: p.address,
       name: `${sym0}/${sym1}`,
@@ -108,7 +109,7 @@ export async function discoverCrosschainPools(): Promise<Pool[]> {
       // DefiLlama capitalises chain names ("Ethereum", "BSC"); normalise before matching.
       .filter(
         ({ p, chain }) =>
-          SUPPORTED_CHAINS.has(chain) && p.apy > 0 && p.tvlUsd > 0 && isStableOnly(p.symbol),
+          SUPPORTED_CHAINS.has(chain) && p.apy > 0 && p.tvlUsd > 0 && isSupportedPair(p.symbol),
       )
       .map(({ p, chain }): Pool => {
         const bridgeCost = BRIDGE_COSTS[chain] ?? 15;

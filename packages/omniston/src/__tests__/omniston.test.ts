@@ -59,7 +59,7 @@ const MOCK_POOLS_API = {
       apy_1d: '12.5',
       lp_total_supply_usd: '1000000',
     },
-    // Unsupported: TON is not a stable — must be filtered out.
+    // Supported: TON is in SUPPORTED_ASSETS now.
     {
       address: 'EQPool2',
       token0_address: TON_ADDRESS,
@@ -130,7 +130,7 @@ describe('discoverPools', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('maps STON.fi pool list to Pool[], keeping only USDC/USDT pools', async () => {
+  it('maps STON.fi pool list to Pool[], keeping only supported-asset pools', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => MOCK_POOLS_API,
@@ -139,15 +139,21 @@ describe('discoverPools', () => {
     const { discoverPools } = await import('../pools.js');
     const pools = await discoverPools();
 
-    // EQPool2 (TON/USDT) is dropped — TON is not a supported stable.
-    expect(pools).toHaveLength(2);
-    expect(pools.map((p) => p.id)).toEqual(['EQPool1', 'EQPool3']);
-    expect(pools.some((p) => p.name.includes('TON'))).toBe(false);
+    // EQPool2 (TON/USDT) now passes — TON is a supported asset.
+    expect(pools).toHaveLength(3);
+    expect(pools.map((p) => p.id)).toEqual(['EQPool1', 'EQPool2', 'EQPool3']);
     expect(pools[0]).toMatchObject({
       id: 'EQPool1',
       name: 'USDT/USDC',
       aprPercent: 12.5,
       liquidityUsdt: 1_000_000,
+      isCrosschain: false,
+    });
+    expect(pools[1]).toMatchObject({
+      id: 'EQPool2',
+      name: 'TON/USDT',
+      aprPercent: 8.0,
+      liquidityUsdt: 500_000,
       isCrosschain: false,
     });
   });
@@ -161,8 +167,8 @@ describe('discoverPools', () => {
     const { discoverPools } = await import('../pools.js');
     const pools = await discoverPools();
 
-    expect(pools[1].aprPercent).toBe(0);
-    expect(pools[1].liquidityUsdt).toBe(200_000);
+    expect(pools[2].aprPercent).toBe(0);
+    expect(pools[2].liquidityUsdt).toBe(200_000);
   });
 
   it('throws when the API returns a non-ok response', async () => {
