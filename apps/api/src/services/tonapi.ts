@@ -31,6 +31,10 @@ const JettonsResponseSchema = z.object({
   balances: z.array(JettonBalanceSchema),
 });
 
+const RatesResponseSchema = z.object({
+  rates: z.record(z.object({ prices: z.record(z.number()).optional() })).optional(),
+});
+
 function nanosToTon(nano: string): number {
   return parseInt(nano, 10) / 1e9;
 }
@@ -57,9 +61,10 @@ export async function fetchBalance(walletAddress: string): Promise<BalanceRespon
     return empty;
   }
 
-  const [accountRes, jettonsRes] = await Promise.all([
+  const [accountRes, jettonsRes, ratesRes] = await Promise.all([
     fetch(`${BASE}/accounts/${walletAddress}`, { headers: headers() }),
     fetch(`${BASE}/accounts/${walletAddress}/jettons?currencies=usd`, { headers: headers() }),
+    fetch(`${BASE}/rates?tokens=ton&currencies=usd`, { headers: headers() }),
   ]);
 
   if (!accountRes.ok) {
@@ -69,8 +74,14 @@ export async function fetchBalance(walletAddress: string): Promise<BalanceRespon
   const account = AccountSchema.parse(await accountRes.json());
   const tonAmount = nanosToTon(account.balance);
 
+  let tonUsdPrice = 0;
+  if (ratesRes.ok) {
+    const ratesData = RatesResponseSchema.parse(await ratesRes.json());
+    tonUsdPrice = ratesData.rates?.['TON']?.prices?.['USD'] ?? 0;
+  }
+
   const assets: AssetBalance[] = [
-    { asset: 'TON', amount: tonAmount, usdValue: 0 },
+    { asset: 'TON', amount: tonAmount, usdValue: toUsd(tonAmount, tonUsdPrice) },
   ];
 
   if (jettonsRes.ok) {
@@ -83,10 +94,6 @@ export async function fetchBalance(walletAddress: string): Promise<BalanceRespon
       const usdValue = toUsd(amount, usdPrice);
       assets.push({ asset: j.jetton.symbol, amount, usdValue });
     }
-
-    // Patch TON USD value from jetton price data if available
-    const tonUsd = jettonsData.balances[0]?.price?.prices?.['usd'] ?? 0;
-    assets[0].usdValue = toUsd(tonAmount, tonUsd);
   }
 
   const idleUsdt = assets.reduce((sum, a) => sum + a.usdValue, 0);
