@@ -32,11 +32,19 @@ function fmtLiquidity(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
-function estimateNetGain(pool: Pool, idleUsdt: number): string {
+function estimateNetGainUsdt(pool: Pool, idleUsdt: number): number {
   const dailyYield = (idleUsdt * pool.aprPercent) / 100 / 365;
-  const net = dailyYield - (pool.estimatedBridgeCostUsdt ?? 0);
+  return dailyYield - (pool.estimatedBridgeCostUsdt ?? 0);
+}
+
+function fmtNetGain(pool: Pool, idleUsdt: number): string {
+  const net = estimateNetGainUsdt(pool, idleUsdt);
   const sign = net >= 0 ? '+' : '';
   return `${sign}$${net.toFixed(2)}/day`;
+}
+
+function fmtRouteCost(pool: Pool): string {
+  return pool.estimatedBridgeCostUsdt ? `$${pool.estimatedBridgeCostUsdt.toFixed(2)}` : '$0.00';
 }
 
 interface Props {
@@ -56,7 +64,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
   const filtered = useMemo(() => {
     const base = (pools ?? [])
       .filter((p) => p.liquidityUsdt >= 100_000 && p.aprPercent > 0 && p.aprPercent < 500_000)
-      .sort((a, b) => b.aprPercent - a.aprPercent);
+      .sort((a, b) => estimateNetGainUsdt(b, idleUsdt) - estimateNetGainUsdt(a, idleUsdt));
 
     if (selectedChain === 'all') return base;
 
@@ -69,26 +77,12 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
       }
       return false;
     });
-  }, [pools, selectedChain]);
+  }, [pools, selectedChain, idleUsdt]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const start = (currentPage - 1) * PAGE_SIZE;
   const poolList = filtered.slice(start, start + PAGE_SIZE);
-
-  // Collect unique chains present in pools for the filter dropdown.
-  const availableChains = useMemo(() => {
-    const chains = new Set<string>();
-    (pools ?? []).forEach((p) => {
-      if (p.isCrosschain) {
-        const chain = p.assetPair.split('-').at(-1);
-        if (chain) chains.add(chain);
-      } else {
-        chains.add('ton');
-      }
-    });
-    return ['all', 'ton', ...Array.from(chains).sort()];
-  }, [pools]);
 
   const hrefForPage = (n: number) => (n <= 1 ? basePath : `${basePath}?page=${n}`);
   const prevHref = currentPage > 1 ? hrefForPage(currentPage - 1) : undefined;
@@ -131,7 +125,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
           </div>
         </CardHeader>
         <p className="mb-4 text-sm text-muted-foreground">
-          Ranked by real net gain on your idle balance after swap fees, gas, and slippage.
+          Ranked by estimated net gain on your idle balance after configured route costs.
         </p>
 
         {filtered.length === 0 ? (
@@ -145,6 +139,7 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
                 <TableHead>Pool</TableHead>
                 <TableHead>APR</TableHead>
                 <TableHead>Liquidity</TableHead>
+                <TableHead>Route cost</TableHead>
                 <TableHead>Est. net gain/day</TableHead>
                 <TableHead className="text-right">Action</TableHead>
               </TableRow>
@@ -170,12 +165,17 @@ export function ScannerView({ pools, cachedAt, idleUsdt = 0, page = 1, basePath 
                   </TableCell>
                   <TableCell className="text-accent">{pool.aprPercent.toFixed(1)}%</TableCell>
                   <TableCell>{fmtLiquidity(pool.liquidityUsdt)}</TableCell>
+                  <TableCell>{fmtRouteCost(pool)}</TableCell>
                   <TableCell className="text-emerald-400">
-                    {estimateNetGain(pool, idleUsdt)}
+                    {fmtNetGain(pool, idleUsdt)}
                   </TableCell>
                   <TableCell className="text-right">
                     <RebalanceButton
-                      pool={{ pair: pool.assetPair, apr: `${pool.aprPercent.toFixed(1)}%`, netGain: estimateNetGain(pool, idleUsdt) }}
+                      pool={{
+                        pair: pool.assetPair,
+                        apr: `${pool.aprPercent.toFixed(1)}%`,
+                        netGain: fmtNetGain(pool, idleUsdt),
+                      }}
                       idleUsdt={idleUsdt}
                     />
                   </TableCell>
@@ -213,6 +213,7 @@ export function ScannerSkeleton() {
             <div key={i} className="flex items-center gap-4 px-4 py-2">
               <Skeleton className="h-4 w-32" />
               <Skeleton className="h-4 w-12" />
+              <Skeleton className="h-4 w-16" />
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-4 w-20" />
               <Skeleton className="ml-auto h-9 w-24 rounded-full" />
