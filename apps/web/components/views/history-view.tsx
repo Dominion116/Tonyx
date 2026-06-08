@@ -44,6 +44,10 @@ function fmtUsd(n: number): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function fmtSignedUsd(n: number): string {
+  return `${n >= 0 ? '+' : '-'}${fmtUsd(Math.abs(n))}`;
+}
+
 function truncateTx(hash: string): string {
   return hash.length > 12 ? `${hash.slice(0, 6)}...${hash.slice(-4)}` : hash;
 }
@@ -69,7 +73,9 @@ function RunRow({ run }: { run: RunSummary }) {
         </div>
       </TableCell>
       <TableCell>{fmtUsd(run.routedAmountUsdt)}</TableCell>
-      <TableCell className="text-emerald-400">+{fmtUsd(run.yieldEarnedUsdt)}</TableCell>
+      <TableCell className={run.yieldEarnedUsdt >= 0 ? 'text-emerald-400' : 'text-red-400'}>
+        {fmtSignedUsd(run.yieldEarnedUsdt)}
+      </TableCell>
       <TableCell>
         <Badge variant={statusVariant[run.status]}>{statusLabel[run.status]}</Badge>
       </TableCell>
@@ -111,7 +117,7 @@ export function HistoryView({ runs, page = 1, prevHref, nextHref }: Props) {
       <Card>
         <CardHeader>
           <CardTitle>Run history</CardTitle>
-          <Badge variant="accent">{completed.length} runs</Badge>
+          <Badge variant="accent">{completed.length} active runs</Badge>
         </CardHeader>
 
         {completed.length === 0 ? (

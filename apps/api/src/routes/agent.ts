@@ -181,6 +181,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       approvalToken,
       originPool: secondPool.name,
       destinationPool: topPool.name,
+      destinationAprPercent: topPool.aprPercent,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
       mira: advisorRec,

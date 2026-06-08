@@ -144,7 +144,7 @@ export function QuoteModal({
               originPool: data.originPool,
               destinationPool: data.destinationPool,
               routedAmountUsdt: data.routedAmountUsdt,
-              aprPercent: parseFloat(pool.apr),
+              aprPercent: data.destinationAprPercent,
               estimatedYieldUsdt: data.estimatedYieldUsdt,
               confidence: data.mira.confidence,
               explanation: data.mira.explanation,
@@ -194,7 +194,9 @@ export function QuoteModal({
                 setStatus('completed');
                 toast({
                   title: 'Rebalance complete',
-                  description: `Into ${pool.pair}.${proposal ? ` Est. ${proposal.estimatedYield}.` : ''}`,
+                  description: `Into ${proposal?.destination ?? 'selected pool'}.${
+                    proposal ? ` Est. ${proposal.estimatedYield}.` : ''
+                  }`,
                 });
               } else if (statusRes.status === 'failed') {
                 clearTimers();

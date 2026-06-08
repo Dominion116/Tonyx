@@ -12,6 +12,7 @@ export const QuoteResponseSchema = z.object({
   approvalToken: z.string().optional(),
   originPool: z.string(),
   destinationPool: z.string(),
+  destinationAprPercent: z.number(),
   routedAmountUsdt: z.number(),
   estimatedYieldUsdt: z.number(),
   mira: MiraRecommendationSchema,
