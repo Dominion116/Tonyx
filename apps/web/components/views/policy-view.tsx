@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { api, ApiError } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-const assetOptions = ['TON', 'USDT', 'NOT', 'STON', 'jUSDT', 'USDe'];
+const assetOptions = ['USDC', 'USDT'];
 
 const cooldownOptions = [
   { value: 3600, label: '1 hour' },
@@ -79,7 +79,7 @@ export function PolicyView() {
   const [minNetGain, setMinNetGain] = useState(5);
   const [spendingFloor, setSpendingFloor] = useState(500);
   const [cooldownSeconds, setCooldownSeconds] = useState(21600);
-  const [assets, setAssets] = useState<string[]>(['TON', 'USDT']);
+  const [assets, setAssets] = useState<string[]>(['USDC', 'USDT']);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>('manual');
 
   useEffect(() => {

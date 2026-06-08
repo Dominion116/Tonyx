@@ -26,7 +26,7 @@ export function ExplanationCard({
         </span>
         <p className="text-sm font-semibold text-white">{title}</p>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{reason}</p>
+      <p className="mt-3 break-words text-sm leading-relaxed text-muted-foreground">{reason}</p>
     </div>
   );
 }
