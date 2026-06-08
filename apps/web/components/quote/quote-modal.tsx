@@ -127,6 +127,7 @@ export function QuoteModal({
           origin: data.originPool,
           destination: data.destinationPool,
           estimatedYield: `${fmtSigned(data.estimatedYieldUsdt)}/day`,
+          routeCostUsdt: data.routeCostUsdt,
           confidence: data.mira.confidence,
           explanation: data.mira.explanation,
           isCrosschain: data.isCrosschain,

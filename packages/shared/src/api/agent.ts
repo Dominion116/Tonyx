@@ -16,6 +16,7 @@ export const QuoteResponseSchema = z.object({
   destinationAprPercent: z.number(),
   routedAmountUsdt: z.number(),
   estimatedYieldUsdt: z.number(),
+  routeCostUsdt: z.number().nonnegative().optional(),
   mira: MiraRecommendationSchema,
   // ── Cross-chain route details (omitted for same-chain TON swaps) ─────────────
   isCrosschain: z.boolean().optional(),

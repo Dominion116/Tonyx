@@ -21,6 +21,29 @@ import { trackExecution, trackCrosschainExecution, getSettlementPhase } from '..
 
 const router = Router();
 
+const USDT_DECIMALS = 1_000_000;
+
+function getExactRouteCostUsdt(quote: { raw: unknown } | null): number | undefined {
+  if (!quote) return undefined;
+
+  const raw = quote.raw as {
+    protocolFeeUnits?: string;
+    integratorFeeUnits?: string;
+  };
+
+  if (raw.protocolFeeUnits === undefined && raw.integratorFeeUnits === undefined) {
+    return undefined;
+  }
+
+  const protocolFeeUnits = Number(raw.protocolFeeUnits ?? 0);
+  const integratorFeeUnits = Number(raw.integratorFeeUnits ?? 0);
+  const totalUnits = protocolFeeUnits + integratorFeeUnits;
+
+  if (!Number.isFinite(totalUnits)) return undefined;
+
+  return Number((totalUnits / USDT_DECIMALS).toFixed(6));
+}
+
 // ─── POST /api/agent/quote ────────────────────────────────────────────────────
 
 /**
@@ -170,6 +193,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
 
     // ── Generate approval token ──────────────────────────────────────────────
     const approvalToken = randomUUID();
+    const routeCostUsdt = getExactRouteCostUsdt(omnistonQuote);
 
     savePendingQuote(approvalToken, {
       walletAddress,
@@ -192,6 +216,7 @@ router.post('/quote', requireAuth, validate(QuoteRequestSchema), async (req, res
       destinationAprPercent: destinationPool.aprPercent,
       routedAmountUsdt: idleAmountUsdt,
       estimatedYieldUsdt,
+      routeCostUsdt,
       mira: advisorRec,
       isCrosschain,
       destinationChain,

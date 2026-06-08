@@ -13,6 +13,7 @@ export interface Proposal {
   origin: string;
   destination: string;
   estimatedYield: string;
+  routeCostUsdt?: number;
   /** 0-1 confidence from Mira. */
   confidence: number;
   explanation: string;
@@ -97,10 +98,16 @@ export function ProposalCard({
 
       <div className="mt-4 flex gap-6">
         <Stat label="Est. yield" value={proposal.estimatedYield} accent />
-        {proposal.isCrosschain && proposal.bridgeCostUsdt !== undefined && (
-          <Stat label="Bridge cost" value={`~$${proposal.bridgeCostUsdt.toFixed(2)}`} />
+        {proposal.routeCostUsdt !== undefined && (
+          <Stat label="Exact route cost" value={`~$${proposal.routeCostUsdt.toFixed(4)}`} />
         )}
       </div>
+
+      {proposal.isCrosschain && proposal.bridgeCostUsdt !== undefined && proposal.routeCostUsdt !== undefined && (
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+          {`Bridge estimate: ~$${proposal.bridgeCostUsdt.toFixed(2)}`}
+        </p>
+      )}
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {proposal.explanation}
